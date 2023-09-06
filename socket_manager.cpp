@@ -1,4 +1,5 @@
 #include "socket_manager.h"
+#include "socket_send.h"
 #include "caes.h"
 #include <iostream>
 
@@ -29,7 +30,7 @@ SocketManager::SocketManager(std::string& serverIP, int port, Info* infoInstance
 }
 
 void SocketManager::getSystemInfo() {
-    GetIPAndMAC(InfoInstance->MAC, InfoInstance->IP, InfoInstance->ServerIP);
+    // GetIPAndMAC(InfoInstance->MAC, InfoInstance->IP, InfoInstance->ServerIP);
 }
 
 bool SocketManager::connectTCP(const std::string& serverIP, int port) {

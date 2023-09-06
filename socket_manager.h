@@ -20,6 +20,7 @@
 #include "info.h"
 #include "task.h"
 #include "Log.h"
+#include "tools.h"
 
 #define MACLEN 20
 #define IPLEN 20
@@ -54,10 +55,6 @@ public:
 
     void HandleTaskToServer(std::string functionName);
     int HandleTaskFromServer(StrPacket* udata);
-
-    bool CheckTaskStatus(std::string task);
-    void UpdateTaskStatus(std::string task, std::thread::id thread_id);
-    void FinishTask(std::string task);
 
     Task* task;
 

@@ -9,7 +9,7 @@ Info::Info() {
 
     char* KeyNum = new char[36];
     std::strcpy(KeyNum, "NoKey");
-    GetThisClientKey(KeyNum);
+    // GetThisClientKey(KeyNum);
     std::strcpy(UUID, KeyNum);
 
 }
