@@ -107,7 +107,6 @@ void Log::LogServer() {
         socklen_t clientAddrSize = sizeof(clientAddr);
         int clientSocket = accept(listeningSocket, (sockaddr*)&clientAddr, &clientAddrSize);
         if (clientSocket > 0) {
-            std::cout << "New client connected." << std::endl;
             std::thread LogReceiveThread([&]() { HandleLogClientConnection(clientSocket); });
             LogReceiveThread.detach();
         }

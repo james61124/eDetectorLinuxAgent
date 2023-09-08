@@ -4,6 +4,7 @@
 #include "info.h"
 #include "socket_manager.h"
 #include "socket_send.h"
+#include "Log.h"
 
 
 // bool IsProcessAlive(DWORD pid) {
@@ -79,7 +80,7 @@ int main(int argc, char* argv[]) {
     int port = std::stoi(argv[2]);
     std::string task = argv[3];
 
-    // Log log;
+    Log log;
     Info* info = new Info();
     SocketSend* socketsend = new SocketSend(info);
     SocketManager socketManager(serverIP, port, info, socketsend);
@@ -88,6 +89,14 @@ int main(int argc, char* argv[]) {
     // enabled check process status thread
     // std::thread CheckStatusThread([&]() { CheckProcessStatus(info); });
     // CheckStatusThread.detach();
+
+    pid_t childPid = fork();
+
+    if (childPid == -1) std::cerr << "Fork failed." << std::endl;
+    else if (childPid == 0) {
+        log.LogServer();
+        exit(EXIT_SUCCESS);
+    }
 
     // handshake
     std::thread receiveThread([&]() { socketManager.receiveTCP(); });

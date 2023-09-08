@@ -12,6 +12,8 @@
 // #include "tools.h"
 #include "socket_send.h"
 #include "info.h"
+#include "scan.h"
+#include "Log.h"
 
 
 
@@ -48,9 +50,9 @@ public:
 
     // // scan
     // int GiveScanInfo(char* buff, SOCKET* tcpSocket);
-    // int GiveProcessData();
+    int GiveProcessData();
     // void ScanRunNowProcess(void* argv, map<DWORD, ProcessInfoData>* pInfo, set<DWORD>* pApiName, vector<UnKnownDataInfo>* pMembuf, SOCKET* tcpSocket);
-    // int GiveScan(char* buff, SOCKET* tcpSocket);
+    int GiveScan(char* buff, int tcpSocket);
     // int GiveScanFragment(char* buff, SOCKET* tcpSocket);
     // int GiveScanEnd(char* buff, SOCKET* tcpSocket);
     // int GiveScanProgress(char* buff, SOCKET* tcpSocket);

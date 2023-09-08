@@ -18,8 +18,8 @@ Task::Task(Info* infoInstance, SocketSend* socketSendInstance) {
 	// functionMap["DetectProcess"] = std::bind(&Task::DetectProcess_, this);
 
     // // packet from server
-    // functionFromServerMap["OpenCheckthread"] = &Task::OpenCheckthread;
-    // functionFromServerMap["UpdateDetectMode"] = &Task::UpdateDetectMode;
+    functionFromServerMap["OpenCheckthread"] = &Task::OpenCheckthread;
+    functionFromServerMap["UpdateDetectMode"] = &Task::UpdateDetectMode;
 
 	// // Scan
 	// functionFromServerMap["GetScan"] = &Task::GetScan;
@@ -70,25 +70,14 @@ int Task::GiveInfo() {
 }
 int Task::OpenCheckthread(StrPacket* udata) {
 
-	printf("store key into registry\n");
-	if (strcmp(udata->csMsg, "null")) {
-		strcpy(info->UUID, udata->csMsg);
-		// WriteRegisterValue(udata->csMsg);
-	}
+	// printf("store key into registry\n");
+	// if (strcmp(udata->csMsg, "null")) {
+	// 	strcpy(info->UUID, udata->csMsg);
+	// 	// WriteRegisterValue(udata->csMsg);
+	// }
 
-	std::thread CheckConnectThread([&]() { CheckConnect(); });
-	CheckConnectThread.detach();
-
-	// strcpy(UUID,udata->csMsg);
-	// GiveDetectInfoFirst();
-
-	//std::future<int> CheckConnectThread = std::async(&Task::CheckConnect, this);
-	//CheckConnectThread.get();
-
-	 //std::thread CheckConnectThread(&Task::CheckConnect, this);
-	 //CheckConnectThread.join();
-
-	// store key into registry
+	// std::thread CheckConnectThread([&]() { CheckConnect(); });
+	// CheckConnectThread.detach();
 
 	return GiveDetectInfoFirst();
 
@@ -153,7 +142,7 @@ int Task::GiveDetectInfo() {
 	//DetectNewNetwork(MyPid);
 
 	// test
-	//GiveProcessData();
+	GiveProcessData();
 	//DetectProcess_();
 	//CollectionComputerInfo();
 	//GiveDriveInfo();
@@ -187,6 +176,43 @@ int Task::CheckConnect() {
     // check kill time
 
     return 0;
+}
+
+// typedef struct {
+//     int pid;
+//     std::string processName;
+//     long processCreateTime; // ProcessCreateTime in Unix timestamp (seconds)
+//     std::string dynamicCommand;
+//     std::string processPath; // Process executable path
+//     int parentPid; // Parent process PID
+//     std::string parentProcessName; // Parent process name
+//     std::string parentProcessPath; // Parent process path
+// } ProcessInfo;
+
+int Task::GiveProcessData() {
+	Scan* scan = new Scan();
+	scan->ScanRunNowProcess();
+	for(int i=0;i<scan->ProcessList.size();i++) {
+		char* buff = new char[DATASTRINGMESSAGELEN];
+		sprintf(buff, "%s|%ld|%s|ProcessMD5|%s|%d|%s|%s|DigitalSign|%ld|InjectionPE, InjectionOther|Injected|Service, AutoRun|HideProcess, HideAttribute|ImportOtherDLL|Hook|ProcessConnectIP",
+				scan->ProcessList[i].processName.c_str(), 
+				scan->ProcessList[i].processCreateTime, 
+				scan->ProcessList[i].dynamicCommand.c_str(), 
+				scan->ProcessList[i].processPath.c_str(), 
+				scan->ProcessList[i].parentPid, 
+				scan->ProcessList[i].parentProcessName.c_str(), 
+				scan->ProcessList[i].parentProcessPath.c_str(),
+				scan->ProcessList[i].pid);
+		log.logger("Debug", buff);
+
+		// std::cout << scan->ProcessList[i].processName << std::endl;
+		// GiveScan(buff, info->tcpSocket);
+	}
+	
+}
+
+int Task::GiveScan(char* buff, int tcpSocket) {
+
 }
 
 // // detect
