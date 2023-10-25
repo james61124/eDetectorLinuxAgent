@@ -10,6 +10,7 @@
 #include <ctime>
 #include <limits.h>
 #include <cstring>
+#include <unordered_set>
 
 typedef struct {
     int pid;
@@ -24,8 +25,10 @@ typedef struct {
 
 class Scan {
 public:
+    std::unordered_set<int>process_id;
     std::vector<ProcessInfo>ProcessList;
     void ScanRunNowProcess();
+    ProcessInfo* GetNewProcessInfo(std::string pid);
 
 private:
     long jiffiesToUnixTimestamp(long jiffies);

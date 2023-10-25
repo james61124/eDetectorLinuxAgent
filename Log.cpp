@@ -84,16 +84,16 @@ void Log::LogServer() {
     sockaddr_in serverAddr;
     serverAddr.sin_family = AF_INET;
     serverAddr.sin_port = htons(12345);
-    serverAddr.sin_addr.s_addr = INADDR_ANY;
+    serverAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
 
     if (bind(listeningSocket, (sockaddr*)&serverAddr, sizeof(serverAddr)) == -1) {
-        std::cerr << "Error binding socket." << std::endl;
+        std::cerr << "Error binding log server socket." << std::endl;
         close(listeningSocket);
         return;
     }
 
     if (listen(listeningSocket, SOMAXCONN) == -1) {
-        std::cerr << "Error listening on socket." << std::endl;
+        std::cerr << "Error listening on log socket." << std::endl;
         close(listeningSocket);
         return;
     }

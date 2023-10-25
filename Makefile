@@ -21,4 +21,4 @@ $(TARGET): $(OBJS)
 clean:
 	rm -f $(OBJS) $(TARGET)
 
-# g++ -std=c++17 -o agent main.cpp caes.cpp info.cpp Log.cpp socket_manager.cpp socket_send.cpp task.cpp tools.cpp
+# g++ -std=c++17 -o agent main.cpp caes.cpp info.cpp Log.cpp socket_manager.cpp socket_send.cpp task.cpp tools.cpp explorer.exe

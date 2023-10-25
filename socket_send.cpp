@@ -4,7 +4,7 @@ SocketSend::SocketSend(Info* infoInstance) {
 	info = infoInstance;
 }
 
-int SocketSend::SendDataToServer(char* Work, char* Mgs, int tcpSocket) {
+int SocketSend::SendDataToServer(char* Work, char* Mgs) {
 	
 	StrDataPacket GetServerMessage;
 	strcpy(GetServerMessage.MAC, info->MAC);
@@ -23,7 +23,7 @@ int SocketSend::SendDataToServer(char* Work, char* Mgs, int tcpSocket) {
 	SetKeys(BIT128, AESKey);
 	EncryptBuffer((BYTE*)buff, STRDATAPACKETSIZE);
 
-	int ret = sendTCP(buff, STRDATAPACKETSIZE, tcpSocket);
+	int ret = sendTCP(buff, STRDATAPACKETSIZE);
 	printf("Send Data Packet: %s\n", Work);
 
 	if (ret > 0) {
@@ -31,13 +31,7 @@ int SocketSend::SendDataToServer(char* Work, char* Mgs, int tcpSocket) {
 		std::string Msg(Mgs);
 		std::string LogMsg = "Send: " + Task + " " + Msg;
 		log.logger("Info", LogMsg);
-		return receiveTCP(tcpSocket);
-	}
-	else {
-		std::string Task(WorkNew);
-		std::string LogMsg = "Error Send: " + Task;
-		log.logger("Error", LogMsg);
-		return 0;
+		return receiveTCP();
 	}
 	
 
@@ -61,7 +55,6 @@ int SocketSend::SendMessageToServer(char* Work, char* Mgs) {
 	strcpy(WorkNew, Work);
 	WorkNew[strlen(Work)] = '\0';
 	
-
 	strcpy(GetServerMessage.DoWorking, WorkNew);
 	strcpy(GetServerMessage.csMsg, Mgs);
 
@@ -70,7 +63,7 @@ int SocketSend::SendMessageToServer(char* Work, char* Mgs) {
 	SetKeys(BIT128, AESKey);
 	EncryptBuffer((BYTE*)buff, STRPACKETSIZE);
 
-	int ret = sendTCP(buff, STRPACKETSIZE, info->tcpSocket);
+	int ret = sendTCP(buff, STRPACKETSIZE);
 
 
 	printf("Send Message Packet: %s\n", Work);
@@ -84,9 +77,9 @@ int SocketSend::SendMessageToServer(char* Work, char* Mgs) {
 	return ret;
 }
 
-bool SocketSend::sendTCP(char* data, long len, int tcpSocket) {
+bool SocketSend::sendTCP(char* data, long len) {
 
-	int ret = send(tcpSocket, data, len, 0);
+	int ret = send(info->tcpSocket, data, len, 0);
 	if (!ret) {
 		Log log;
 		std::string LogMsg = "Error Send data.";
@@ -99,11 +92,11 @@ bool SocketSend::sendTCP(char* data, long len, int tcpSocket) {
 	return ret;
 }
 
-int SocketSend::receiveTCP(int tcpSocket) {
+int SocketSend::receiveTCP() {
 	
 	while (true) {
 		char buff[STRPACKETSIZE];
-		int ret = recv(tcpSocket, buff, sizeof(buff), 0);
+		int ret = recv(info->tcpSocket, buff, sizeof(buff), 0);
 
 		SetKeys(BIT128, AESKey);
 		DecryptBuffer((BYTE*)buff, STRPACKETSIZE);

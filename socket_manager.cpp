@@ -30,7 +30,46 @@ SocketManager::SocketManager(std::string& serverIP, int port, Info* infoInstance
 }
 
 void SocketManager::getSystemInfo() {
-    // GetIPAndMAC(InfoInstance->MAC, InfoInstance->IP, InfoInstance->ServerIP);
+    const char* interfaceName = "ens34"; 
+    // struct if_nameindex *if_ni, *i;
+    // if_ni = if_nameindex();
+
+    // if (if_ni == NULL) {
+    //     perror("if_nameindex");
+    //     return 1;
+    // }
+
+    // for (i = if_ni; !((i->if_index == 0) && (i->if_name == NULL)); ++i) {
+    //     struct ifreq ifr;
+    //     int sockfd;
+
+    //     sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    //     if (sockfd == -1) {
+    //         perror("socket");
+    //         continue;
+    //     }
+
+    //     memset(&ifr, 0, sizeof(ifr));
+    //     snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), "%s", i->if_name);
+
+    //     if (ioctl(sockfd, SIOCGIFFLAGS, &ifr) == -1) {
+    //         perror("ioctl");
+    //         close(sockfd);
+    //         continue;
+    //     }
+
+    //     // Check if the interface is up (active)
+    //     if (ifr.ifr_flags & IFF_UP) {
+    //         interfaceName = ifr.ifr_name;
+    //         std::cout << "Interface Name: " << ifr.ifr_name << std::endl;
+    //     }
+    //     close(sockfd);
+    // }
+
+    // if_freenameindex(if_ni);
+
+    
+    tool.GetIPAndMAC(interfaceName, InfoInstance->MAC, InfoInstance->IP);
 }
 
 bool SocketManager::connectTCP(const std::string& serverIP, int port) {
@@ -91,7 +130,8 @@ void SocketManager::receiveTCP() {
             std::cout << "Receive: " << udata->DoWorking << std::endl;
 
             std::string Task(udata->DoWorking);
-            std::string LogMsg = "Receive: " + Task;
+            std::string TaskMsg(udata->csMsg);
+            std::string LogMsg = "Receive: " + Task + " " + TaskMsg;
             log.logger("Info", LogMsg);
 
             if (!HandleTaskFromServer(udata)) break;

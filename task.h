@@ -8,12 +8,21 @@
 #include <set>
 #include <map>
 #include <fstream>
+#include <sys/utsname.h>
+#include <sys/stat.h>
+
+#include <sys/types.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <netinet/in.h>
 
 // #include "tools.h"
 #include "socket_send.h"
 #include "info.h"
 #include "scan.h"
 #include "Log.h"
+#include "StrPacket.h"
+#include "explorer.h"
 
 
 
@@ -39,20 +48,30 @@ public:
     int GiveDetectInfoFirst();
     int GiveDetectInfo();
     int OpenCheckthread(StrPacket* udata);
+    int UpdateDetectMode(StrPacket* udata);
     int CheckConnect();
 
     // // detect
+    void DetectProcess();
     // int DetectProcess_();
     // int GiveDetectProcess(char* buff, SOCKET* tcpSocket);
     // int GiveDetectProcessFrag(char* buff, SOCKET* tcpSocket);
     // int GiveDetectNetwork(char* buff, SOCKET* tcpSocket);
     
 
-    // // scan
-    // int GiveScanInfo(char* buff, SOCKET* tcpSocket);
+    // scan
+    int GetScan(StrPacket* udata);
     int GiveProcessData();
-    // void ScanRunNowProcess(void* argv, map<DWORD, ProcessInfoData>* pInfo, set<DWORD>* pApiName, vector<UnKnownDataInfo>* pMembuf, SOCKET* tcpSocket);
-    int GiveScan(char* buff, int tcpSocket);
+
+    // image
+    int GetImage(StrPacket* udata);
+    int SearchImageFile();
+
+    int GetDrive(StrPacket* udata);
+    int ExplorerInfo(StrPacket* udata);
+    int GiveExplorerData();
+
+    
     // int GiveScanFragment(char* buff, SOCKET* tcpSocket);
     // int GiveScanEnd(char* buff, SOCKET* tcpSocket);
     // int GiveScanProgress(char* buff, SOCKET* tcpSocket);
@@ -77,9 +96,9 @@ public:
 
    
     
-    int UpdateDetectMode(StrPacket* udata);
+    
     // int GetScanInfoData_(StrPacket* udata);
-    // int GetScan(StrPacket* udata);
+    
     // int GetProcessInfo(StrPacket* udata);
     // int GetDrive(StrPacket* udata);
     // //int ExplorerInfo(StrPacket* udata);
@@ -94,6 +113,11 @@ private:
     
     Tool tool;
     Log log;
+
+    int SendZipFileToServer(const char* feature, const char* zipFileName);
+    int SendDataPacketToServer(const char* function, char* buff);
+    int SendMessagePacketToServer(const char* function, char* buff);
+    int CreateNewSocket();
 
     // // scan
     // void GiveScanDataSendServer(char* pMAC, char* pIP, char* pMode, map<DWORD, ProcessInfoData>* pFileInfo, vector<UnKnownDataInfo>* pUnKnownData, SOCKET* tcpSocket);

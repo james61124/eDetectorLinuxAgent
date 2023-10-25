@@ -91,7 +91,6 @@ int main(int argc, char* argv[]) {
     // CheckStatusThread.detach();
 
     pid_t childPid = fork();
-
     if (childPid == -1) std::cerr << "Fork failed." << std::endl;
     else if (childPid == 0) {
         log.LogServer();

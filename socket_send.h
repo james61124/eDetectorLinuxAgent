@@ -13,11 +13,10 @@ public:
     SocketSend(Info* infoInstance);
     const char* AESKey = "AES Encrypt Decrypt";
     Info* info;
-    bool sendTCP(char* data, long len, int tcpSocket);
-    int SendDataToServer(char* Work, char* Mgs, int tcpSocket);
+    bool sendTCP(char* data, long len);
+    int SendDataToServer(char* Work, char* Mgs);
     int SendMessageToServer(char* Work, char* Mgs);
-
-    int receiveTCP(int tcpSocket);
+    int receiveTCP();
 
 private:
     Tool tool;

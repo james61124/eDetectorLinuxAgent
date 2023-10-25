@@ -16,6 +16,8 @@
 #define DATASTRINGMESSAGELEN 65436
 #define STRDATAPACKETSIZE 65536
 
+#define MAX_PATH_EX 512
+
 struct StrPacket
 {
 	char MAC[MACLEN];

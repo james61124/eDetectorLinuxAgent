@@ -3,8 +3,8 @@
 Info::Info() {
     DetectProcess = 0;
     DetectNetwork = 0;
-    Port = 1234;
-    DetectPort = 1235;
+    Port = 1988;
+    DetectPort = 1989;
     tcpSocket = 0;
 
     char* KeyNum = new char[36];

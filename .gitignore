@@ -2,3 +2,4 @@ agent
 explorer
 *_test.cpp
 *.txt
+*.zip
