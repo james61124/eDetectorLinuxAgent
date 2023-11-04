@@ -23,7 +23,7 @@ public:
 
     int tcpSocket;
 
-    std::unordered_map<std::string, int> processMap;
+    std::unordered_map<std::string, pid_t> processMap;
 
 };
 

@@ -47,6 +47,8 @@ int SocketSend::SendDataToServer(char* Work, char* Mgs) {
 int SocketSend::SendMessageToServer(char* Work, char* Mgs) {
 	Log log;
 	StrPacket GetServerMessage;
+
+	
 	strcpy(GetServerMessage.MAC, info->MAC);
 	strcpy(GetServerMessage.IP, info->IP);
 	strcpy(GetServerMessage.UUID, info->UUID);
@@ -60,13 +62,17 @@ int SocketSend::SendMessageToServer(char* Work, char* Mgs) {
 
 	char* buff = (char*)&GetServerMessage;
 
+	
+
 	SetKeys(BIT128, AESKey);
 	EncryptBuffer((BYTE*)buff, STRPACKETSIZE);
 
 	int ret = sendTCP(buff, STRPACKETSIZE);
+	if(ret) printf("Send Message Packet: %s %s %s\n", info->MAC, info->IP, Work);
+	else printf("Send Message Packet Failed: %s\n", Work);
 
 
-	printf("Send Message Packet: %s\n", Work);
+	
 	std::string Task(WorkNew);
 	std::string Msg(Mgs);
 	std::string LogMsg = "Send: " + Task + " " + Msg;

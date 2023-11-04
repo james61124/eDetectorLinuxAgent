@@ -18,8 +18,8 @@ FileAttributes Explorer::GetFileAttributes(const fs::path& filePath) {
             // ctime
             std::time_t changeTime = fileStat.st_ctime;
 
-            attributes.createTime = 000;
-            attributes.writeTime = 000;
+            attributes.createTime = accessTime;
+            attributes.writeTime = changeTime;
             attributes.accessTime = accessTime;
             attributes.EntryModifiedTime = modifyTime;
             attributes.dataLen = (long)fileStat.st_size;
@@ -61,7 +61,8 @@ void Explorer::ListFilesRecursively(const fs::path& directoryPath, int depth, st
 
             m_progressIdx++;
             FileAttributes attributes = GetFileAttributes(entry.path());
-            outputFile << entry.path().filename() << "|" << attributes.isDirectory << "|" << attributes.isDeleted << "|" << attributes.createTime << "|" << attributes.writeTime << "|" << attributes.accessTime << "|"
+
+            outputFile << entry.path().filename().string() << "|" << attributes.isDirectory << "|" << attributes.isDeleted << "|" << attributes.createTime << "|" << attributes.writeTime << "|" << attributes.accessTime << "|"
                                                             << attributes.EntryModifiedTime << "|" << attributes.dataLen << "|" << m_progressIdx << "|" << parent_progressIdx << std::endl;
 
                                      

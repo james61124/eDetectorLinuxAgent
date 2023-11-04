@@ -3,6 +3,7 @@
 #include <fstream>
 #include <chrono>
 #include <ctime>
+#include <string>
 
 #include <iomanip>
 #include <sys/stat.h>

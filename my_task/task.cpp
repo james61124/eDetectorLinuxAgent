@@ -31,6 +31,10 @@ Task::Task(Info* infoInstance, SocketSend* socketSendInstance) {
     functionFromServerMap["GetDrive"] = &Task::GetDrive; // ExplorerInfo_
 	functionFromServerMap["ExplorerInfo"] = &Task::ExplorerInfo;
 
+	// Collect
+	functionFromServerMap["GetCollectInfo"] = &Task::GetCollectInfo;
+	
+
 	// Image
 	functionFromServerMap["GetImage"] = &Task::GetImage;
 
@@ -132,8 +136,8 @@ int Task::OpenCheckthread(StrPacket* udata) {
 	// }
 	
 
-	std::thread CheckConnectThread([&]() { CheckConnect(); });
-	CheckConnectThread.detach();
+	// std::thread CheckConnectThread([&]() { CheckConnect(); });
+	// CheckConnectThread.detach();
 
 	return GiveDetectInfoFirst();
 
@@ -162,17 +166,23 @@ int Task::UpdateDetectMode(StrPacket* udata) {
 			log.logger("Error", "failed to create DetectProcess process");
 		}
 		else if (childPid == 0) {
+			info->tcpSocket = CreateNewSocket();
 			DetectProcess();
 			exit(EXIT_SUCCESS);
 		}
 
-		info->processMap["DetectProcess"] = DetectProcessPid;
+		info->processMap["DetectProcess"] = childPid;
 		log.logger("Debug", "DetectProcess enabled");
 	}
 	else {
 		auto it = info->processMap.find("DetectProcess");
 		if (it != info->processMap.end() && it->second != 0 ) {
-			// kill detect process
+			if (kill(it->second, SIGKILL) == 0) {
+				log.logger("Info", "DetectProcess has been terminated");
+				it->second = 0;
+			} else {
+				log.logger("Error", "Failed to terminate DetectProcess");
+			}
 		}
 	}
 
@@ -180,13 +190,28 @@ int Task::UpdateDetectMode(StrPacket* udata) {
 		int DetectNetworkPid = 0;
 		// run detect network
 
+		pid_t childPid = fork();
+		if (childPid == -1) {
+			log.logger("Error", "failed to create DetectNetwork process");
+		}
+		else if (childPid == 0) {
+			info->tcpSocket = CreateNewSocket();
+			DetectNetwork();
+			exit(EXIT_SUCCESS);
+		}
+
 		info->processMap["DetectNetwork"] = DetectNetworkPid;
 		log.logger("Debug", "DetectNetwork enabled");
 	}
 	else {
 		auto it = info->processMap.find("DetectNetwork");
 		if (it != info->processMap.end() && it->second != 0) {
-			// kill detect process
+			if (kill(it->second, SIGKILL) == 0) {
+				log.logger("Info", "DetectNetwork has been terminated");
+				it->second = 0;
+			} else {
+				log.logger("Error", "Failed to terminate DetectNetwork");
+			}
 		}
 	}
 
@@ -230,57 +255,86 @@ int Task::CheckConnect() {
 
 void Task::DetectProcess() {
 	Scan* scan = new Scan();
-	scan->ScanRunNowProcess();
+	// scan->ScanRunNowProcess();
 
 	while(true) {
 		DIR *dir;
 		struct dirent *entry;
 
 		// Open the /proc directory
-		dir = opendir("/proc");
-		if (dir == NULL) {
-			perror("opendir");
-			return;
-		}
-
 		// Traverse the /proc directory
-		while ((entry = readdir(dir)) != NULL) {
-			// Ensure directory name is a number (PID)
-			std::string dirName = entry->d_name;
-			auto it = scan->process_id.find(std::stoi(dirName));
-			if (it == scan->process_id.end()) {
-				ProcessInfo* process_info = scan->GetNewProcessInfo(dirName);
-				char* buff = new char[DATASTRINGMESSAGELEN];
-				sprintf(buff, "%s|%ld|%s|0|%s|%d|%s|%s|0|%d|0,0|0|0,0|0,0|null|null",
-						process_info->processName.c_str(), 
-						process_info->processCreateTime, 
-						process_info->dynamicCommand.c_str(), 
-						process_info->processPath.c_str(), 
-						process_info->parentPid, 
-						process_info->parentProcessName.c_str(), 
-						process_info->parentProcessPath.c_str(),
-						process_info->pid);
-				SendDataPacketToServer("GiveDetectProcess", buff);
+		while(true) {
+			dir = opendir("/proc");
+			if (dir == NULL) {
+				perror("opendir");
+				return;
 			}
+
+			try { // has to deal with stoi issue
+				while ((entry = readdir(dir)) != NULL) {
+					// Ensure directory name is a number (PID)
+					std::string dirName = entry->d_name;
+					if (std::all_of(dirName.begin(), dirName.end(), ::isdigit)) {
+						auto it = scan->process_id.find(std::stoi(dirName));		
+						if (it == scan->process_id.end()) {
+							ProcessInfo* process_info = scan->GetNewProcessInfo(dirName);
+							if(process_info!=nullptr) {
+								char* buff = new char[DATASTRINGMESSAGELEN];
+								sprintf(buff, "%s|%ld|%s|0|%s|%d|%s|%s|0|%d|0,0|0|0,0|0,0|null|null",
+										process_info->processName.c_str(), 
+										process_info->processCreateTime, 
+										process_info->dynamicCommand.c_str(), 
+										process_info->processPath.c_str(), 
+										process_info->parentPid, 
+										process_info->parentProcessName.c_str(), 
+										process_info->parentProcessPath.c_str(),
+										process_info->pid);
+								SendDataPacketToServer("GiveDetectProcess", buff);
+							}
+							
+						}
+					}
+					
+				}
+				
+			} catch (const std::exception& e) {
+				std::cerr << "Exception caught: " << e.what() << std::endl;
+			}
+
+			closedir(dir);
+
+			
 		}
+		
 	}
 }
 
+void Task::DetectNetwork() {
+	Netstat* netstat = new Netstat(info, socketsend);
+	netstat->my_netstat();
+}
+
 int Task::GetScan(StrPacket* udata) {
-	pid_t childPid = fork();
-    if (childPid == -1) {
-		log.logger("Error", "failed to create scan process");
-	}
-    else if (childPid == 0) {
-		info->tcpSocket = CreateNewSocket();
-        GiveProcessData();
-        exit(EXIT_SUCCESS);
-    }
+	// pid_t childPid = fork();
+    // if (childPid == -1) {
+	// 	log.logger("Error", "failed to create scan process");
+	// }
+    // else if (childPid == 0) {
+	// 	info->tcpSocket = CreateNewSocket();
+    //     GiveProcessData();
+    //     exit(EXIT_SUCCESS);
+    // }
+
+	GiveProcessData();
 }
 
 int Task::GiveProcessData() {
 	Scan* scan = new Scan();
-	scan->ScanRunNowProcess();
+	try { // has to deal with stoi issue
+		scan->ScanRunNowProcess();
+	} catch (const std::exception& e) {
+		// std::cerr << "Exception caught: " << e.what() << std::endl;
+	}
 
 	std::remove(SCANFILE);
 	std::remove("scan.zip");
@@ -310,6 +364,10 @@ int Task::GiveProcessData() {
 	// 10.0.2.15,51858,204.79.197.200,443,CLOSE_WAIT>1691129938
     
 	for(int i=0;i<scan->ProcessList.size();i++) {
+		char* progress = new char[DATASTRINGMESSAGELEN];
+		sprintf(progress, "%d/%d", i, scan->ProcessList.size());
+		int ret = SendDataPacketToServer("GiveScanProgress", progress);
+
 		char* buff = new char[DATASTRINGMESSAGELEN];
 		// %s|%ld|%s|ProcessMD5|%s|%d|%s|%s|DigitalSign|%ld|InjectionPE, InjectionOther|Injected|Service, AutoRun|HideProcess, HideAttribute|ImportOtherDLL|Hook|ProcessConnectIP
 		sprintf(buff, "%s|%ld|%s|0|%s|%d|%s|%s|0|%d|0,0|0|0,0|0,0|null|null|null",
@@ -344,7 +402,7 @@ int Task::GiveProcessData() {
 
 
 int Task::GetDrive(StrPacket* udata) {
-	const char* message = "C-EXT32,HDD";
+	const char* message = "Linux-EXT32,HDD|";
 	char* buff = new char[STRINGMESSAGELEN];
 	strcpy(buff, message);
 	
@@ -365,8 +423,19 @@ int Task::GiveExplorerData() {
 	std::remove(EXPLORERFILE);
 	std::remove("explorer.zip");
 
+	char* TmpBuffer = new char[DATASTRINGMESSAGELEN];
+	sprintf(TmpBuffer, "%s|%s", "Linux", "EXT32");
+	int ret = SendDataPacketToServer("Explorer", TmpBuffer);
+
+	char* progress = new char[DATASTRINGMESSAGELEN];
+	sprintf(progress, "%d/%d", 100000, 300000);
+	SendDataPacketToServer("GiveExplorerProgress", progress);
+
+	
+
 	Explorer* explorer = new Explorer();
 	explorer->GetExplorerInfo("Explorer.txt");
+
 
 	std::string explorer_file(EXPLORERFILE);
 	std::string compress_command = "zip explorer.zip " + explorer_file;
@@ -376,15 +445,26 @@ int Task::GiveExplorerData() {
         return 0;
     }
 
-	char* TmpBuffer = new char[DATASTRINGMESSAGELEN];
-	sprintf(TmpBuffer, "%s|%s", "C", "EXT32");
-	int ret = SendDataPacketToServer("Explorer", TmpBuffer);
+	char* progress_end = new char[DATASTRINGMESSAGELEN];
+	sprintf(progress_end, "%d/%d", 300000, 300000);
+	SendDataPacketToServer("GiveExplorerProgress", progress_end);
 
 	if(!SendZipFileToServer("Explorer", "explorer.zip")) log.logger("Error", "failed to send explorer zip file.");
 
 	return ret;
 
 
+}
+
+int Task::GetCollectInfo(StrPacket* udata) {
+	pid_t childPid = fork();
+    if (childPid == -1) {
+		log.logger("Error", "failed to create Collect process");
+	}
+    else if (childPid == 0) {
+		info->tcpSocket = CreateNewSocket();
+        exit(EXIT_SUCCESS);
+    }
 }
 
 
@@ -394,59 +474,61 @@ int Task::GetImage(StrPacket* udata) {
 		log.logger("Error", "failed to create image process");
 	}
     else if (childPid == 0) {
+		info->tcpSocket = CreateNewSocket();
         SearchImageFile();
         exit(EXIT_SUCCESS);
     }
 }
 int Task::SearchImageFile() {
-	const char* file_names[] = {
-        "/home/*/.bash_history",
-        "/root/.bash_history",
-        "/var/log/",
-        "/proc/version",
-        "/etc/*-release",
-        "/etc/hostname",
-        "/etc/passwd",
-        "/etc/hosts",
-        "/etc/sudoers",
-        "/etc/ssh/sshd_config",
-        "/etc/shells",
-        "/etc/cron.",
-        "/etc/crontab",
-        "/var/spool/cron/crontabs",
-        "/etc/anacrontab",
-        "/var/spool/anacron",
-        "/proc/net/arp",
-        "/proc/net/route",
-        "/etc/resolv.conf",
-        "/proc/mounts",
-        "/etc/exports",
-        "/etc/fstab"
-    };
+	// const char* file_names[] = {
+    //     "/home/*/.bash_history",
+    //     "/root/.bash_history",
+    //     "/var/log/",
+    //     "/proc/version",
+    //     "/etc/*-release",
+    //     "/etc/hostname",
+    //     "/etc/passwd",
+    //     "/etc/hosts",
+    //     "/etc/sudoers",
+    //     "/etc/ssh/sshd_config",
+    //     "/etc/shells",
+    //     "/etc/cron.",
+    //     "/etc/crontab",
+    //     "/var/spool/cron/crontabs",
+    //     "/etc/anacrontab",
+    //     "/var/spool/anacron",
+    //     "/proc/net/arp",
+    //     "/proc/net/route",
+    //     "/etc/resolv.conf",
+    //     "/proc/mounts",
+    //     "/etc/exports",
+    //     "/etc/fstab"
+    // };
 
-    int total_length = 0;
-    for (int i = 0; i < sizeof(file_names) / sizeof(file_names[0]); i++) {
-        total_length += snprintf(NULL, 0, "%s ", file_names[i]);
-    }
+    // int total_length = 0;
+    // for (int i = 0; i < sizeof(file_names) / sizeof(file_names[0]); i++) {
+    //     total_length += snprintf(NULL, 0, "%s ", file_names[i]);
+    // }
 
-    char* files_to_zip = (char*)malloc(total_length + 1);
-    int offset = 0;
-    for (int i = 0; i < sizeof(file_names) / sizeof(file_names[0]); i++) {
-        offset += snprintf(files_to_zip + offset, total_length - offset + 1, "%s ", file_names[i]);
-    }
+    // char* files_to_zip = (char*)malloc(total_length + 1);
+    // int offset = 0;
+    // for (int i = 0; i < sizeof(file_names) / sizeof(file_names[0]); i++) {
+    //     offset += snprintf(files_to_zip + offset, total_length - offset + 1, "%s ", file_names[i]);
+    // }
 
-    files_to_zip[total_length - 1] = '\0';
-    char zip_command[1024];
-    snprintf(zip_command, sizeof(zip_command), "zip image.zip %s", files_to_zip);
-    int result = system(zip_command);
+    // files_to_zip[total_length - 1] = '\0';
+    // char zip_command[1024];
+    // snprintf(zip_command, sizeof(zip_command), "zip image.zip %s", files_to_zip);
+    // int result = system(zip_command);
 
-    if (result) {
-		log.logger("Error", "failed to zip image file.");
-		return 0;
-	}
-    free(files_to_zip);
+    // if (result) {
+	// 	log.logger("Error", "failed to zip image file.");
+	// 	return 0;
+	// }
+    // free(files_to_zip);
 
-	if(!SendZipFileToServer("Image", "image.zip")) log.logger("Error", "failed to send image zip file.");
+	irfilelist();
+	if(!SendZipFileToServer("Image", "IR_list.tar.gz")) log.logger("Error", "failed to send image zip file.");
 
 	return 1;
 
@@ -467,7 +549,9 @@ int Task::SendZipFileToServer(const char* feature, const char* zipFileName) {
 
 			if(!strcmp(feature, "Scan")) Sendret = SendDataPacketToServer("GiveScanInfo", TmpBuffer);
 			else if(!strcmp(feature, "Image")) Sendret = SendDataPacketToServer("GiveImageInfo", TmpBuffer);
-			else if(!strcmp(feature, "Explorer")) Sendret = SendDataPacketToServer("GiveExplorerInfo", TmpBuffer);
+			else if(!strcmp(feature, "Explorer")) {
+				Sendret = SendDataPacketToServer("GiveExplorerInfo", TmpBuffer);
+			}
 			else {
 				log.logger("Error", "SendZipFileToServer feature not found.");
 				return 0;

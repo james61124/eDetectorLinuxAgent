@@ -1,10 +1,13 @@
 #include <iostream>
 #include <thread>
 
-#include "info.h"
-#include "socket_manager.h"
-#include "socket_send.h"
-#include "Log.h"
+#include "my_task/info.h"
+#include "my_task/socket_manager.h"
+#include "my_task/socket_send.h"
+#include "my_task/Log.h"
+#include "my_ps/output.h"
+
+
 
 
 // bool IsProcessAlive(DWORD pid) {
@@ -69,36 +72,42 @@
 // 	}
 // }
 
+// nohup ./agent 192.168.200.163 1988 1989 &
+
 int main(int argc, char* argv[]) {
 
-    if (argc < 3) {
-        std::cerr << "Usage: " << argv[0] << " <serverIP> <port>" << std::endl;
-        return 1;
-    }
+    Process process;
+    process.my_ps();
+    // irfilelist();
 
-    std::string serverIP = argv[1];
-    int port = std::stoi(argv[2]);
-    std::string task = argv[3];
+    // if (argc < 3) {
+    //     std::cerr << "Usage: " << argv[0] << " <serverIP> <port>" << std::endl;
+    //     return 1;
+    // }
 
-    Log log;
-    Info* info = new Info();
-    SocketSend* socketsend = new SocketSend(info);
-    SocketManager socketManager(serverIP, port, info, socketsend);
+    // std::string serverIP = argv[1];
+    // int port = std::stoi(argv[2]);
+    // std::string task = argv[3];
+
+    // Log log;
+    // Info* info = new Info();
+    // SocketSend* socketsend = new SocketSend(info);
+    // SocketManager socketManager(serverIP, port, info, socketsend);
 
 
-    // enabled check process status thread
-    // std::thread CheckStatusThread([&]() { CheckProcessStatus(info); });
-    // CheckStatusThread.detach();
+    // // enabled check process status thread
+    // // std::thread CheckStatusThread([&]() { CheckProcessStatus(info); });
+    // // CheckStatusThread.detach();
 
-    pid_t childPid = fork();
-    if (childPid == -1) std::cerr << "Fork failed." << std::endl;
-    else if (childPid == 0) {
-        log.LogServer();
-        exit(EXIT_SUCCESS);
-    }
+    // pid_t childPid = fork();
+    // if (childPid == -1) std::cerr << "Fork failed." << std::endl;
+    // else if (childPid == 0) {
+    //     log.LogServer();
+    //     exit(EXIT_SUCCESS);
+    // }
 
-    // handshake
-    std::thread receiveThread([&]() { socketManager.receiveTCP(); });
-    socketManager.HandleTaskToServer("GiveInfo");
-    receiveThread.join();
+    // // handshake
+    // std::thread receiveThread([&]() { socketManager.receiveTCP(); });
+    // socketManager.HandleTaskToServer("GiveInfo");
+    // receiveThread.join();
 }

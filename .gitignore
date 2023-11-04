@@ -3,3 +3,6 @@ explorer
 *_test.cpp
 *.txt
 *.zip
+*.o
+main
+

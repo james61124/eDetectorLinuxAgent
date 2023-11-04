@@ -15,6 +15,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <netinet/in.h>
+#include <signal.h>
 
 // #include "tools.h"
 #include "socket_send.h"
@@ -23,6 +24,8 @@
 #include "Log.h"
 #include "StrPacket.h"
 #include "explorer.h"
+#include "../my_netstat/netstat.h"
+#include "../my_IRfiletar/irfilelist.h"
 
 
 
@@ -53,6 +56,7 @@ public:
 
     // // detect
     void DetectProcess();
+    void DetectNetwork();
     // int DetectProcess_();
     // int GiveDetectProcess(char* buff, SOCKET* tcpSocket);
     // int GiveDetectProcessFrag(char* buff, SOCKET* tcpSocket);
@@ -62,6 +66,8 @@ public:
     // scan
     int GetScan(StrPacket* udata);
     int GiveProcessData();
+
+    int GetCollectInfo(StrPacket* udata);
 
     // image
     int GetImage(StrPacket* udata);
