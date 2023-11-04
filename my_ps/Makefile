@@ -12,7 +12,7 @@ CPPFLAGS += -D_GNU_SOURCE
 CPPFLAGS += -D_FILE_OFFSET_BITS=64 -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE
 
 ifeq ($(origin CC), undefined)
-CC	= g++
+CC	= gcc
 endif
 LD	= $(CC)
 PKG_CONFIG ?= pkg-config
@@ -37,7 +37,7 @@ SUBDIRS	= $(PROC_PATH)/
 PLIB	= -l$(PROC_NAME)
 
 %.o:		%.c common.h $<
-		$(CC) $(CFLAGS) $(CPPFLAGS) -c $<
+		$(CC) -c $(CFLAGS) $(CPPFLAGS) -c $<
 
 all:		common.h subdirs $(PROC) output.o
 

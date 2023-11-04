@@ -123,7 +123,7 @@ PSLIB	= -l$(PS_LIB_NAME)
 # AESLIB	= -l$(AES_LIB_NAME)
 
 %.o:	%.cpp
-	$(CC) -std=c++17 $(CFLAGS) $(CPPFLAGS) -c $<
+	$(CC) -std=c++17 -c $(CFLAGS) $(CPPFLAGS) -c $<
 	
 all:	$(PROGS) 
 

@@ -185,7 +185,7 @@ static char** file2strvec(const char* dir, const char* what) {
 	}
 	if (end_of_file && buf[n-1])		/* last read char not null */
 	    buf[n++] = '\0';			/* so append null-terminator */
-	rbuf = static_cast<char*>(xrealloc(rbuf, tot + n));		/* allocate more memory */
+	rbuf = xrealloc(rbuf, tot + n);		/* allocate more memory */
 	memcpy(rbuf + tot, buf, n);		/* copy buffer into it */
 	tot += n;				/* increment total byte ctr */
 	if (end_of_file)
@@ -203,7 +203,7 @@ static char** file2strvec(const char* dir, const char* what) {
 	    c += sizeof(char*);
     c += sizeof(char*);				/* one extra for NULL term */
 
-    rbuf = static_cast<char*>(xrealloc(rbuf, tot + c + align));	/* make room for ptrs AT END */
+    rbuf = xrealloc(rbuf, tot + c + align);	/* make room for ptrs AT END */
     endbuf = rbuf + tot;			/* addr just past data buf */
     q = ret = (char**) (endbuf+align);		/* ==> free(*ret) to dealloc */
     *q++ = p = rbuf;				/* point ptrs to the strings */
@@ -234,7 +234,7 @@ next_proc:				/* get next PID for consideration */
 	goto next_proc;
 
     if (!p)
-	p = static_cast<proc_t*>(xcalloc(p, sizeof *p)); 	/* passed buf or alloced mem */
+	p = xcalloc(p, sizeof *p); 	/* passed buf or alloced mem */
     p->euid = sb.st_uid;		/* need a way to get real uid */
 
     if ((file2str(path, "stat", sbuf, sizeof sbuf)) == -1)

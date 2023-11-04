@@ -11,9 +11,9 @@ all:	lib$(PROC_NAME).a
 lib$(PROC_NAME).a:	Makefile $(OBJS)
 			@$(AR) rcs $@ $(OBJS)
 
-readproc.o: readproc.h readproc.cpp
+readproc.o: readproc.h readproc.c
 
-sysinfo.o: sysinfo.h sysinfo.cpp
+sysinfo.o: sysinfo.h sysinfo.c
 
 clean:
 		rm -f -- *.o lib$(PROC_NAME).a

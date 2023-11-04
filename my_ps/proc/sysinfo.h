@@ -1,3 +1,3 @@
-extern unsigned long long Hertz;   /* clock tick frequency */
+extern unsigned long long Hertz_;   /* clock tick frequency */
 
 extern int        uptime ();

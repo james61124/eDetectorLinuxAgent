@@ -5,7 +5,10 @@
 #include "my_task/socket_manager.h"
 #include "my_task/socket_send.h"
 #include "my_task/Log.h"
+
+extern "C" {
 #include "my_ps/output.h"
+}
 
 
 
@@ -76,8 +79,7 @@
 
 int main(int argc, char* argv[]) {
 
-    Process process;
-    process.my_ps();
+    my_ps();
     // irfilelist();
 
     // if (argc < 3) {
