@@ -5,6 +5,12 @@
 #include <future>
 #include <thread>
 
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+
+
+
 #include "task.h"
 
 #define SCANFILE "scan.txt"
@@ -45,6 +51,10 @@ Task::Task(Info* infoInstance, SocketSend* socketSendInstance) {
 // handshake
 int Task::GiveInfo() {
     // getSystemInfo();
+
+	// Netstat* netstat = new Netstat(info, socketsend);
+	// int ret = netstat->scan_netstat();
+
 	char* functionName = new char[24];
 	strcpy(functionName, "GiveInfo");
 	char* buffer = new char[STRINGMESSAGELEN];
@@ -83,6 +93,22 @@ int Task::GiveInfo() {
 	} else {
 		log.logger("Error", "failed to get system info");
 	}
+
+	// get boot time
+	std::ifstream statFile("/proc/stat");
+    while (std::getline(statFile, line)) {
+        std::istringstream iss(line);
+        std::string key;
+        unsigned long long value;
+        iss >> key;
+        if (key == "btime") {
+            if (iss >> value) {
+				BootTime = value;
+            } else {
+				log.logger("Error", "Failed to parse btime value.");
+            }
+        }
+    }
 	
 	// key
 	std::string KeyNum = "";
@@ -122,6 +148,7 @@ int Task::OpenCheckthread(StrPacket* udata) {
         log.logger("Error", "edetector exists, but it is not a folder");
         return 0;
     }
+	
 	// if (strcmp(udata->csMsg, "null")) {
 	//  	strcpy(info->UUID, udata->csMsg);
 
@@ -173,6 +200,8 @@ int Task::UpdateDetectMode(StrPacket* udata) {
 
 		info->processMap["DetectProcess"] = childPid;
 		log.logger("Debug", "DetectProcess enabled");
+
+		// DetectProcess();
 	}
 	else {
 		auto it = info->processMap.find("DetectProcess");
@@ -232,6 +261,10 @@ int Task::GiveDetectInfo() {
 	// test
 	// GiveProcessData();
 
+	// Netstat* netstat = new Netstat(info, socketsend);
+	// netstat->scan_netstat();
+	// my_ps();
+
 
 	return ret;
 }
@@ -254,59 +287,120 @@ int Task::CheckConnect() {
 
 
 void Task::DetectProcess() {
-	Scan* scan = new Scan();
-	// scan->ScanRunNowProcess();
+
+	remove("/tmp/edetector");
+
+	pid_t childPid = fork();
+	if (childPid == -1) {
+		log.logger("Error", "failed to create DetectProcess process");
+	}
+	else if (childPid == 0) {
+		info->tcpSocket = CreateNewSocket();
+		detect_ps();
+		exit(EXIT_SUCCESS);
+	}
+
+	int sockfd, client_sockfd;
+    struct sockaddr_un server_addr, client_addr;
+    char buffer[DATASTRINGMESSAGELEN];
+    
+    sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (sockfd == -1) {
+        perror("socket");
+        return;
+    }
+
+    server_addr.sun_family = AF_UNIX;
+    strncpy(server_addr.sun_path, "/tmp/edetector", sizeof(server_addr.sun_path));
+
+    if (bind(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1) {
+        perror("bind");
+        return;
+    }
+
+    if (listen(sockfd, 1) == -1) {
+        perror("listen");
+        return;
+    }
+
+    socklen_t client_len = sizeof(client_addr);
+    client_sockfd = accept(sockfd, (struct sockaddr*)&client_addr, &client_len);
+
+    if (client_sockfd == -1) {
+        perror("accept");
+        return;
+    }
 
 	while(true) {
-		DIR *dir;
-		struct dirent *entry;
+		int bytesRead = read(client_sockfd, buffer, sizeof(buffer));
+		if (bytesRead > 0) {
+			buffer[bytesRead] = '\0';
+			// printf("%s\n", buffer);
+			SendDataPacketToServer("GiveDetectProcess", buffer);
 
-		// Open the /proc directory
-		// Traverse the /proc directory
-		while(true) {
-			dir = opendir("/proc");
-			if (dir == NULL) {
-				perror("opendir");
-				return;
-			}
+			const char* response = "DataRight";
+			write(client_sockfd, response, strlen(response));
+		}
+	}
 
-			try { // has to deal with stoi issue
-				while ((entry = readdir(dir)) != NULL) {
-					// Ensure directory name is a number (PID)
-					std::string dirName = entry->d_name;
-					if (std::all_of(dirName.begin(), dirName.end(), ::isdigit)) {
-						auto it = scan->process_id.find(std::stoi(dirName));		
-						if (it == scan->process_id.end()) {
-							ProcessInfo* process_info = scan->GetNewProcessInfo(dirName);
-							if(process_info!=nullptr) {
-								char* buff = new char[DATASTRINGMESSAGELEN];
-								sprintf(buff, "%s|%ld|%s|0|%s|%d|%s|%s|0|%d|0,0|0|0,0|0,0|null|null",
-										process_info->processName.c_str(), 
-										process_info->processCreateTime, 
-										process_info->dynamicCommand.c_str(), 
-										process_info->processPath.c_str(), 
-										process_info->parentPid, 
-										process_info->parentProcessName.c_str(), 
-										process_info->parentProcessPath.c_str(),
-										process_info->pid);
-								SendDataPacketToServer("GiveDetectProcess", buff);
-							}
+    close(client_sockfd);
+    close(sockfd);
+
+
+
+	// Scan* scan = new Scan();
+	// // scan->ScanRunNowProcess();
+
+	// while(true) {
+	// 	DIR *dir;
+	// 	struct dirent *entry;
+
+	// 	// Open the /proc directory
+	// 	// Traverse the /proc directory
+	// 	while(true) {
+	// 		dir = opendir("/proc");
+	// 		if (dir == NULL) {
+	// 			perror("opendir");
+	// 			return;
+	// 		}
+
+	// 		try { // has to deal with stoi issue
+	// 			while ((entry = readdir(dir)) != NULL) {
+	// 				// Ensure directory name is a number (PID)
+	// 				std::string dirName = entry->d_name;
+	// 				if (std::all_of(dirName.begin(), dirName.end(), ::isdigit)) {
+	// 					auto it = scan->process_id.find(std::stoi(dirName));		
+	// 					if (it == scan->process_id.end()) {
+	// 						ProcessInfo* process_info = scan->GetNewProcessInfo(dirName);
+	// 						if(process_info!=nullptr) {
+	// 							char* buff = new char[DATASTRINGMESSAGELEN];
+	// 							sprintf(buff, "%s|%ld|%s|0|%s|%d|%s|%s|0|%d|0,0|0|0,0|0,0|null|null",
+	// 									process_info->processName.c_str(), 
+	// 									process_info->processCreateTime, 
+	// 									process_info->dynamicCommand.c_str(), 
+	// 									process_info->processPath.c_str(), 
+	// 									process_info->parentPid, 
+	// 									process_info->parentProcessName.c_str(), 
+	// 									process_info->parentProcessPath.c_str(),
+	// 									process_info->pid);
+	// 							SendDataPacketToServer("GiveDetectProcess", buff);
+	// 						}
 							
-						}
-					}
+	// 					}
+	// 				}
 					
-				}
+	// 			}
 				
-			} catch (const std::exception& e) {
-				std::cerr << "Exception caught: " << e.what() << std::endl;
-			}
+	// 		} catch (const std::exception& e) {
+	// 			std::cerr << "Exception caught: " << e.what() << std::endl;
+	// 		}
 
-			closedir(dir);
+	// 		closedir(dir);
 
 			
-		}
+	// 	}
 		
-	}
+	// }
 }
 
 void Task::DetectNetwork() {
@@ -315,20 +409,48 @@ void Task::DetectNetwork() {
 }
 
 int Task::GetScan(StrPacket* udata) {
-	// pid_t childPid = fork();
-    // if (childPid == -1) {
-	// 	log.logger("Error", "failed to create scan process");
-	// }
-    // else if (childPid == 0) {
-	// 	info->tcpSocket = CreateNewSocket();
-    //     GiveProcessData();
-    //     exit(EXIT_SUCCESS);
-    // }
 
-	GiveProcessData();
+	pid_t childPid = fork();
+    if (childPid == -1) {
+		log.logger("Error", "failed to create scan process");
+	}
+    else if (childPid == 0) {
+		info->tcpSocket = CreateNewSocket();
+        GiveProcessData();
+        exit(EXIT_SUCCESS);
+    }
+
+	// GiveProcessData();
+}
+
+bool Task::isAutorunProcess(pid_t processId) {
+    // Convert process ID to string
+    std::string pidString = std::to_string(processId);
+
+    // Check if the process ID is present in /proc
+    std::ifstream procFile("/proc/" + pidString + "/cmdline");
+    if (!procFile.is_open()) {
+        std::cerr << "Error opening /proc/" << pidString << "/cmdline." << std::endl;
+        return false;
+    }
+
+    // Read the cmdline file to get the command line of the process
+    std::string cmdline;
+    std::getline(procFile, cmdline);
+
+    // Check if the command line contains an indicator of autorun
+    bool isAutorun = (cmdline.find("/etc/init.d/") != std::string::npos ||
+                      cmdline.find("/etc/systemd/system/") != std::string::npos ||
+                      cmdline.find("/etc/rc.d/") != std::string::npos);
+
+    return isAutorun;
 }
 
 int Task::GiveProcessData() {
+
+	Netstat* netstat = new Netstat(info, socketsend);
+	int ret = netstat->scan_netstat();
+
 	Scan* scan = new Scan();
 	try { // has to deal with stoi issue
 		scan->ScanRunNowProcess();
@@ -362,29 +484,74 @@ int Task::GiveProcessData() {
 	// C:\ProgramData\Microsoft\Windows Defender\Platform\4.18.23070.1004-0\MpOav.dll:1,26791ea393ffed815c9332f05c025721;|
 	// NlsAnsiCodePage:0x0000FFFD0000FDE9 -> 0x0000003F000003B6;|
 	// 10.0.2.15,51858,204.79.197.200,443,CLOSE_WAIT>1691129938
-    
+
 	for(int i=0;i<scan->ProcessList.size();i++) {
 		char* progress = new char[DATASTRINGMESSAGELEN];
 		sprintf(progress, "%d/%d", i, scan->ProcessList.size());
 		int ret = SendDataPacketToServer("GiveScanProgress", progress);
+		
+		scan->ProcessList[i].network = "null";
+
+		for(int j=0;j<netstat->net_info.size();j++){
+			if(std::stoi(netstat->net_info[j].process_name) == scan->ProcessList[i].pid) {
+
+				std::string network_state = "";
+				switch (netstat->net_info[j].state) {
+					case 1: network_state = "TCP_ESTABLISHED"; break;
+					case 2: network_state = "TCP_SYN_SENT"; break;
+					case 3: network_state = "TCP_SYN_RECV"; break;
+					case 4: network_state = "TCP_FIN_WAIT1"; break;
+					case 5: network_state = "TCP_FIN_WAIT2"; break;
+					case 6: network_state = "TCP_TIME_WAIT"; break;
+					case 7: network_state = "TCP_CLOSE"; break;
+					case 8: network_state = "TCP_CLOSE_WAIT"; break;
+					case 9: network_state = "TCP_LAST_ACK"; break;
+					case 10: network_state = "TCP_LISTEN"; break;
+					case 11: network_state = "TCP_CLOSING"; break;
+					default: network_state = "Unknown State"; break;
+				}
+
+				scan->ProcessList[i].network = info->IP;
+				scan->ProcessList[i].network += ",";
+				scan->ProcessList[i].network += netstat->net_info[j].local_port;
+				scan->ProcessList[i].network += ",";
+				scan->ProcessList[i].network += netstat->net_info[j].foreign_address;
+				scan->ProcessList[i].network += ",";
+				scan->ProcessList[i].network += netstat->net_info[j].foreign_port;
+				scan->ProcessList[i].network += ",";
+				scan->ProcessList[i].network += network_state;
+				scan->ProcessList[i].network += ">";
+				scan->ProcessList[i].network += netstat->net_info[j].socket_time;
+				scan->ProcessList[i].network += ";";
+			}
+		}
+
+		int isAutoRun = 0;
+		if(isAutorunProcess(scan->ProcessList[i].pid)) isAutoRun = 1;
 
 		char* buff = new char[DATASTRINGMESSAGELEN];
 		// %s|%ld|%s|ProcessMD5|%s|%d|%s|%s|DigitalSign|%ld|InjectionPE, InjectionOther|Injected|Service, AutoRun|HideProcess, HideAttribute|ImportOtherDLL|Hook|ProcessConnectIP
-		sprintf(buff, "%s|%ld|%s|0|%s|%d|%s|%s|0|%d|0,0|0|0,0|0,0|null|null|null",
+		sprintf(buff, "%s|%ld|%s|0|%s|%d|%s|%s|0|%d|0,0|0|0,%d|0,0|null|null|%s",
 				scan->ProcessList[i].processName.c_str(), 
 				scan->ProcessList[i].processCreateTime, 
-				scan->ProcessList[i].dynamicCommand.c_str(), 
+				scan->ProcessList[i].dynamicCommand, 
 				scan->ProcessList[i].processPath.c_str(), 
 				scan->ProcessList[i].parentPid, 
 				scan->ProcessList[i].parentProcessName.c_str(), 
 				scan->ProcessList[i].parentProcessPath.c_str(),
-				scan->ProcessList[i].pid);
+				scan->ProcessList[i].pid,
+				isAutoRun,
+				scan->ProcessList[i].network.c_str());
+		printf("%s\n", scan->ProcessList[i].dynamicCommand);
 		file << buff << '\n';
 		delete[] buff; 
 
 	}
 
     file.close();
+
+	
+	// my_ps();
 
 	std::string scan_file(SCANFILE);
 	std::string compress_command = "zip scan.zip " + scan_file;
@@ -462,7 +629,6 @@ int Task::GetCollectInfo(StrPacket* udata) {
 		log.logger("Error", "failed to create Collect process");
 	}
     else if (childPid == 0) {
-		info->tcpSocket = CreateNewSocket();
         exit(EXIT_SUCCESS);
     }
 }

@@ -36,7 +36,9 @@ void Scan::ScanRunNowProcess() {
         ProcessInfo process_info;
         process_info.processName = "null";
         process_info.processCreateTime = 0;
-        process_info.dynamicCommand = "null";
+        // process_info.dynamicCommand = "null";
+        process_info.dynamicCommand = new char[512];
+        strcpy(process_info.dynamicCommand, "null");
         process_info.processPath = "null";
         process_info.parentPid = 0;
         process_info.parentProcessName = "null";
@@ -98,25 +100,47 @@ void Scan::ScanRunNowProcess() {
                     }
 
                 } catch (const std::invalid_argument& e) {
-                    std::cerr << "Invalid argument: " << e.what() << std::endl;
+                    // std::cerr << "Invalid argument: " << e.what() << std::endl;
                 }
             }
 
             // Get process's DynamicCommand (command line arguments)
             std::ifstream cmdLineFile("/proc/" + dirName + "/cmdline");
+            strcpy(process_info.dynamicCommand, "null");
             if (cmdLineFile) {
-                std::string dynamicCommand;
-                std::string line;
-                
-                while (std::getline(cmdLineFile, line)) {
-                    dynamicCommand += line;
+
+                memset(process_info.dynamicCommand, 0, sizeof(process_info.dynamicCommand));
+
+                std::ostringstream dynamicCommandStream;
+                std::string test = "";
+                char singleChar;
+                int charCount = 0;
+
+                while (cmdLineFile.get(singleChar)) {
+                    // dynamicCommandStream << singleChar;
+                    process_info.dynamicCommand[charCount++] = singleChar;
+                    // test += singleChar;
+                    // printf("%d %c", charCount, singleChar);
                 }
 
-                if (dynamicCommand.empty()) {
-                    dynamicCommand = "null";
-                }
                 
-                process_info.dynamicCommand = dynamicCommand;
+
+                // if (charCount == 0) {
+                //     strcpy(process_info.dynamicCommand, "null");
+                //     charCount = 4; // Set charCount to the length of "null"
+                // }
+
+                // Ensure null termination
+                process_info.dynamicCommand[charCount] = '\0';
+
+                // printf("\nthis: %d %s\n", charCount, process_info.dynamicCommand);
+
+
+                // if (dynamicCommand.empty()) {
+                //     dynamicCommand = "null";
+                // }
+                
+                // process_info.dynamicCommand = dynamicCommand;
             }
 
 
@@ -141,87 +165,114 @@ void Scan::ScanRunNowProcess() {
     closedir(dir);
 }
 
-ProcessInfo* Scan::GetNewProcessInfo(std::string pid) {
-    ProcessInfo* process_info = nullptr;
+// ProcessInfo* Scan::GetNewProcessInfo(std::string pid) {
+//     ProcessInfo* process_info = nullptr;
 
-    std::string dirName = pid;
-    if (std::all_of(dirName.begin(), dirName.end(), ::isdigit)) {
+//     std::string dirName = pid;
+//     if (std::all_of(dirName.begin(), dirName.end(), ::isdigit)) {
 
-        process_info = new ProcessInfo;
+//         process_info = new ProcessInfo;
 
-        process_info->pid = std::stoi(dirName);
+//         process_info->pid = std::stoi(dirName);
 
-        // Get process name
-        std::ifstream commFile("/proc/" + dirName + "/comm");
-        if (commFile) {
-            std::string processName;
-            getline(commFile, processName);
-            process_info->processName = processName;
-        }
-        commFile.close(); 
+//         // Get process name
+//         std::ifstream commFile("/proc/" + dirName + "/comm");
+//         if (commFile) {
+//             std::string processName;
+//             getline(commFile, processName);
+//             process_info->processName = processName;
+//         }
+//         commFile.close(); 
 
-        // Get process start time (jiffies)
-        std::ifstream statFile("/proc/" + dirName + "/stat");
-        if (statFile) {
-            std::string statLine;
-            getline(statFile, statLine);
-            std::istringstream statStream(statLine);
-            std::vector<std::string> statTokens;
-            std::string token;
+//         // Get process start time (jiffies)
+//         std::ifstream statFile("/proc/" + dirName + "/stat");
+//         if (statFile) {
+//             std::string statLine;
+//             getline(statFile, statLine);
+//             std::istringstream statStream(statLine);
+//             std::vector<std::string> statTokens;
+//             std::string token;
 
-            // Split the stat line into tokens
-            while (std::getline(statStream, token, ' ')) {
-                statTokens.push_back(token);
-            }
+//             // Split the stat line into tokens
+//             while (std::getline(statStream, token, ' ')) {
+//                 statTokens.push_back(token);
+//             }
 
-            if (statTokens.size() >= 22) {
-                long processCreateTime = std::stol(statTokens[21]);
-                long unixTimestamp = jiffiesToUnixTimestamp(processCreateTime);
-                process_info->processCreateTime = unixTimestamp;
-            }
+//             if (statTokens.size() >= 22) {
+//                 long processCreateTime = std::stol(statTokens[21]);
+//                 long unixTimestamp = jiffiesToUnixTimestamp(processCreateTime);
+//                 process_info->processCreateTime = unixTimestamp;
+//             }
 
-            try {
-                // Get parent process's PID (fourth field)
-                int parentPid = std::stoi(statTokens[3]);
+//             try {
+//                 // Get parent process's PID (fourth field)
+//                 int parentPid = std::stoi(statTokens[3]);
 
-                // Get parent process's path
-                std::string parentProcessPath = getProcessPath(parentPid);
+//                 // Get parent process's path
+//                 std::string parentProcessPath = getProcessPath(parentPid);
 
-                process_info->parentProcessPath = parentProcessPath;
-                process_info->parentPid = parentPid;
+//                 process_info->parentProcessPath = parentProcessPath;
+//                 process_info->parentPid = parentPid;
 
-                // Get parent process's name
-                std::ifstream parentCommFile("/proc/" + std::to_string(parentPid) + "/comm");
-                if (parentCommFile) {
-                    std::string parentProcessName;
-                    getline(parentCommFile, parentProcessName);
-                    process_info->parentProcessName = parentProcessName;
-                }
+//                 // Get parent process's name
+//                 std::ifstream parentCommFile("/proc/" + std::to_string(parentPid) + "/comm");
+//                 if (parentCommFile) {
+//                     std::string parentProcessName;
+//                     getline(parentCommFile, parentProcessName);
+//                     process_info->parentProcessName = parentProcessName;
+//                 }
 
-            } catch (const std::invalid_argument& e) {
-                std::cerr << "Invalid argument: " << e.what() << std::endl;
-            }
-        }
-        statFile.close();
+//             } catch (const std::invalid_argument& e) {
+//                 std::cerr << "Invalid argument: " << e.what() << std::endl;
+//             }
+//         }
+//         statFile.close();
 
-        // Get process's DynamicCommand (command line arguments)
-        std::ifstream cmdLineFile("/proc/" + dirName + "/cmdline");
-        if (cmdLineFile) {
-            std::string dynamicCommand;
-            getline(cmdLineFile, dynamicCommand);
-            process_info->dynamicCommand = dynamicCommand;
-        }
-        cmdLineFile.close();
+//         // Get process's DynamicCommand (command line arguments)
+//         std::ifstream cmdLineFile("/proc/" + dirName + "/cmdline");
+//         if (cmdLineFile) {
+//             std::ostringstream dynamicCommandStream;
+//             std::string line;
+//             char singleChar;
 
-        // Get process path
-        std::string processPath = getProcessPath(std::stoi(dirName));
-        process_info->processPath = processPath;
+//             while (cmdLineFile.get(singleChar)) {
+//                 dynamicCommandStream << singleChar;
+//                 printf("%c", singleChar);
+//             }
 
-        ProcessList.push_back(*process_info);
-        process_id.insert(process_info->pid);
+//             // while(!feof(cmdLineFile)) {
+//             //     char singleChar;
+//             //     cmdLineFile.get(singleChar);
+//             //     dynamicCommandStream << singleChar;
+//             //     printf("%c", singleChar);
+//             // }
+
+            
 
 
-    }
+//             // while (std::getc(cmdLineFile, line)) {
+//             //     dynamicCommandStream << line;
+//             // }
+//             process_info->dynamicCommand = dynamicCommandStream.str();
 
-    return process_info;
-}
+//             // process_info->dynamicCommand = std::string(std::istreambuf_iterator<char>(cmdLineFile),
+//             //                       std::istreambuf_iterator<char>());
+
+//             // std::string dynamicCommand;
+//             // getline(cmdLineFile, dynamicCommand);
+//             // process_info->dynamicCommand = dynamicCommand;
+//         }
+//         cmdLineFile.close();
+
+//         // Get process path
+//         std::string processPath = getProcessPath(std::stoi(dirName));
+//         process_info->processPath = processPath;
+
+//         ProcessList.push_back(*process_info);
+//         process_id.insert(process_info->pid);
+
+
+//     }
+
+//     return process_info;
+// }

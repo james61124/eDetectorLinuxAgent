@@ -6,9 +6,8 @@
 #include "my_task/socket_send.h"
 #include "my_task/Log.h"
 
-extern "C" {
-#include "my_ps/output.h"
-}
+#include "my_task/task.h"
+
 
 
 
@@ -79,37 +78,40 @@ extern "C" {
 
 int main(int argc, char* argv[]) {
 
-    my_ps();
+    
     // irfilelist();
 
-    // if (argc < 3) {
-    //     std::cerr << "Usage: " << argv[0] << " <serverIP> <port>" << std::endl;
-    //     return 1;
-    // }
+    // Task task;
+    // task.DetectProcess();
 
-    // std::string serverIP = argv[1];
-    // int port = std::stoi(argv[2]);
-    // std::string task = argv[3];
+    if (argc < 3) {
+        std::cerr << "Usage: " << argv[0] << " <serverIP> <port>" << std::endl;
+        return 1;
+    }
 
-    // Log log;
-    // Info* info = new Info();
-    // SocketSend* socketsend = new SocketSend(info);
-    // SocketManager socketManager(serverIP, port, info, socketsend);
+    std::string serverIP = argv[1];
+    int port = std::stoi(argv[2]);
+    std::string task = argv[3];
+
+    Log log;
+    Info* info = new Info();
+    SocketSend* socketsend = new SocketSend(info);
+    SocketManager socketManager(serverIP, port, info, socketsend);
 
 
-    // // enabled check process status thread
-    // // std::thread CheckStatusThread([&]() { CheckProcessStatus(info); });
-    // // CheckStatusThread.detach();
+    // enabled check process status thread
+    // std::thread CheckStatusThread([&]() { CheckProcessStatus(info); });
+    // CheckStatusThread.detach();
 
-    // pid_t childPid = fork();
-    // if (childPid == -1) std::cerr << "Fork failed." << std::endl;
-    // else if (childPid == 0) {
-    //     log.LogServer();
-    //     exit(EXIT_SUCCESS);
-    // }
+    pid_t childPid = fork();
+    if (childPid == -1) std::cerr << "Fork failed." << std::endl;
+    else if (childPid == 0) {
+        log.LogServer();
+        exit(EXIT_SUCCESS);
+    }
 
-    // // handshake
-    // std::thread receiveThread([&]() { socketManager.receiveTCP(); });
-    // socketManager.HandleTaskToServer("GiveInfo");
-    // receiveThread.join();
+    // handshake
+    std::thread receiveThread([&]() { socketManager.receiveTCP(); });
+    socketManager.HandleTaskToServer("GiveInfo");
+    receiveThread.join();
 }

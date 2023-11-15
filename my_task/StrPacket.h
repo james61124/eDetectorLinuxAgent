@@ -36,5 +36,7 @@ struct StrDataPacket//64K
 	char csMsg[DATASTRINGMESSAGELEN];
 };
 
+
+
 #endif
 

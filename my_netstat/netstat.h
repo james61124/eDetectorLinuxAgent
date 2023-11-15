@@ -18,6 +18,8 @@
 
 #include <unordered_set>
 #include <string>
+#include <sstream>
+#include <vector>
 
 #include "../my_task/socket_send.h"
 
@@ -129,12 +131,26 @@ enum {
 };
 
 
+typedef struct NetInfo_ {
+  std::string process_name;
+  std::string foreign_address;
+  std::string foreign_port;
+  std::string socket_time;
+  std::string program_time;
+  std::string local_port;
+  int in_or_out_connection;
+  int state;
+} NetInfo;
+
+
 
 // void get_boot_time(void);
 // int my_netstat();
 
 class Netstat {
 public:
+
+  std::vector<NetInfo>net_info;
 
     struct prg_node {
         struct prg_node *next;
@@ -152,17 +168,19 @@ public:
     FILE * fp;
     std::unordered_set<std::string> netstat_info;
     unsigned long time_of_boot;
+    int scan = 0;
 
 
     void get_boot_time(void);
     int my_netstat();
+    int scan_netstat();
     void stat2proc(const char *directory, unsigned long * prg_time);
     void prg_cache_add(unsigned long inode, char *name, unsigned long socket_time);
     void prg_cache_get(unsigned long inode, char *ret, int retSize, char *rem_addr);
     int extract_type_1_socket_inode(const char lname[], unsigned long * inode_p);
     int extract_type_2_socket_inode(const char lname[], unsigned long * inode_p);
     void prg_cache_load(void);
-    void finish_this_one(char *rem_addr , unsigned long inode, char *local_port, int in_or_out_conn);
+    void finish_this_one(char *rem_addr , unsigned long inode, char *local_port, int in_or_out_conn, int state);
     const struct aftype *process_sctp_addr_str(const char *addr_str, struct sockaddr_storage *sas);
     void sctp_assoc_do_one(int lnr, char *line, const char *proto);
     int sctp_info_assocs(void);

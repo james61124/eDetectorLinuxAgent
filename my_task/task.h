@@ -27,6 +27,11 @@
 #include "../my_netstat/netstat.h"
 #include "../my_IRfiletar/irfilelist.h"
 
+extern "C" {
+#include "../my_ps/output.h"
+}
+
+
 
 
 
@@ -64,6 +69,7 @@ public:
     
 
     // scan
+    bool isAutorunProcess(pid_t processId);
     int GetScan(StrPacket* udata);
     int GiveProcessData();
 

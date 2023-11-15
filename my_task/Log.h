@@ -15,6 +15,8 @@
 #include <arpa/inet.h>
 #include <unistd.h> 
 
+#include <sys/un.h>
+
 class Log {
 public:
 	std::queue<std::string>MsgQueue;

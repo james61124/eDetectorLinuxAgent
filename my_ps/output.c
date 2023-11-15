@@ -1,8 +1,18 @@
 #include "common.h"
 #include "output.h"
 
+#include <stdbool.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+
+#include <sys/stat.h>
+
 #define PROC_HASH_SIZE 256
 #define PROC_HASHIT(x) ((x) % PROC_HASH_SIZE)
+
+#define MAX_STRINGS 1000000
+#define MAX_BUF 512
 
 static struct proc_node {
     struct proc_node *next;
@@ -25,6 +35,13 @@ static unsigned long time_of_boot;
 static int need_record = 0;
 
 static format_node    *format_list = (format_node *)0xdeadbeef;
+
+bool container[MAX_STRINGS]; 
+int count = 0;
+char process[65536];
+int detect = 0;
+int sockfd;
+int current_process = 0;
 
 /***************************************************************************/
 
@@ -145,9 +162,16 @@ static int pr_args(void){
       if((OUTBUF_SIZE-i > 1) && (*(lc+1))) tmp[i++] = ' ';
       lc++;
     }
-    fprintf(fp_out, "%s", tmp);
+    
+    if(!detect) fprintf(fp_out, "%s", tmp);
+    char buf[MAX_BUF];
+    snprintf(buf, sizeof(buf), "%s", tmp);
+    strcat(process, buf);
   } else {
-    fprintf(fp_out, "[%s]", pp->cmd);
+    if(!detect) fprintf(fp_out, "[%s]", pp->cmd);
+    char buf[MAX_BUF];
+    snprintf(buf, sizeof(buf), "[%s]", pp->cmd);
+    strcat(process, buf);
   }
   return 0;
 }
@@ -163,7 +187,10 @@ static int pr_etime(void){
   hh = t%24;
   t /= 24;
   dd = t;
-  fprintf(fp_out, "%u-%02u:%02u:%02u", dd, hh, mm, ss);
+  if(!detect) fprintf(fp_out, "%u-%02u:%02u:%02u", dd, hh, mm, ss);
+  char buf[MAX_BUF];
+  snprintf(buf, sizeof(buf), "%u-%02u:%02u:%02u", dd, hh, mm, ss);
+  strcat(process, buf);
   return 0;
 }
 
@@ -176,17 +203,27 @@ static int pr_c(void){
   seconds = seconds_since_boot - pp->start_time / Hertz_;
   if(seconds) pcpu = (total_time * 100ULL / Hertz_) / seconds;
   if (pcpu > 99U) pcpu = 99U;
-  fprintf(fp_out, "%u", pcpu);
+  if(!detect) fprintf(fp_out, "%u", pcpu);
+  char buf[MAX_BUF];
+  snprintf(buf, sizeof(buf), "%u", pcpu);
+  strcat(process, buf);
   return 0;
 }
 
 static int pr_pid(void){
-  fprintf(fp_out, "%u", pp->pid);
+  if(!detect) fprintf(fp_out, "%u", pp->pid);
+  char buf[MAX_BUF];
+  snprintf(buf, sizeof(buf), "%u", pp->pid);
+  strcat(process, buf);
+  current_process = pp->pid;
   return 0;
 }
 
 static int pr_ppid(void){
-  fprintf(fp_out, "%u", pp->ppid);
+  if(!detect) fprintf(fp_out, "%u", pp->ppid);
+  char buf[MAX_BUF];
+  snprintf(buf, sizeof(buf), "%u", pp->ppid);
+  strcat(process, buf);
   return 0;
 }
 
@@ -203,17 +240,26 @@ static int pr_time(void){
   hh = t%24;
   t /= 24;
   dd = t;
-  fprintf(fp_out, "%u-%02u:%02u:%02u", dd, hh, mm, ss);
+  if(!detect) fprintf(fp_out, "%u-%02u:%02u:%02u", dd, hh, mm, ss);
+  char buf[MAX_BUF];
+  snprintf(buf, sizeof(buf), "%u-%02u:%02u:%02u", dd, hh, mm, ss);
+  strcat(process, buf);
   return c;
 }
 
 static int pr_euser(void){
-    fprintf(fp_out, "%s", pp->euser);
+    if(!detect) fprintf(fp_out, "%s", pp->euser);
+    char buf[MAX_BUF];
+    snprintf(buf, sizeof(buf), "%s", pp->euser);
+    strcat(process, buf);
     return 0;
 }
 
 static int pr_stat(void){
-    fprintf(fp_out, "%c", pp->state);
+    if(!detect) fprintf(fp_out, "%c", pp->state);
+    char buf[MAX_BUF];
+    snprintf(buf, sizeof(buf), "%c", pp->state);
+    strcat(process, buf);
     return 0;
 }
 
@@ -233,73 +279,188 @@ static int pr_lstart(void){
   time_t t;
   t = time_of_boot + pp->start_time / Hertz_;
   //printf("%24.24s", ctime(&t));
-  fprintf(fp_out, "%lu", t);
+  if(!detect) fprintf(fp_out, "%lu", t);
+  char buf[MAX_BUF];
+  snprintf(buf, sizeof(buf), "%lu", t);
+  strcat(process, buf);
   return 0;
 }
 
 static int pr_path(void){
-    fprintf(fp_out, "%s", pp->path);
+    if(!detect) fprintf(fp_out, "%s", pp->path);
+    char buf[MAX_BUF];
+    snprintf(buf, sizeof(buf), "%s", pp->path);
+    strcat(process, buf);
     return 0;
 }
 
 static int pr_name(void){
     char* tmp = strrchr(pp->path, '/');
-    if (tmp && strlen(pp->cmd) >= 15)
-	fprintf(fp_out, "%s", tmp + 1);
-    else
-	fprintf(fp_out, "%s", pp->cmd);
+    if (tmp && strlen(pp->cmd) >= 15){
+      if(!detect) fprintf(fp_out, "%s", tmp + 1);
+      char buf[MAX_BUF];
+      snprintf(buf, sizeof(buf), "%s", tmp + 1);
+      strcat(process, buf);
+    }
+    else {
+      if(!detect) fprintf(fp_out, "%s", pp->cmd);
+      char buf[MAX_BUF];
+      snprintf(buf, sizeof(buf), "%s", pp->cmd);
+      strcat(process, buf);
+    }
+	
     return 0;
 }
 
 static int pr_parent(void){
     char tmp[1024];
     proc_cache_get(pp->ppid, tmp, sizeof tmp);
-    fprintf(fp_out, "%s", tmp);
+    if(!detect) fprintf(fp_out, "%s", tmp);
+    char buf[MAX_BUF];
+    snprintf(buf, sizeof(buf), "%s", tmp);
+    strcat(process, buf);
     return 0;
 }
 
 static int pr_processMD5(void) {
-  fprintf(fp_out, "%s", "0");
+  if(!detect) fprintf(fp_out, "%s", "0");
+  char buf[MAX_BUF];
+  snprintf(buf, sizeof(buf), "%s", "0");
+  strcat(process, buf);
   return 0;
 }
 
 static int pr_DigitalSign(void) {
-  fprintf(fp_out, "%s", "0");
+  if(!detect) fprintf(fp_out, "%s", "0");
+  char buf[MAX_BUF];
+  snprintf(buf, sizeof(buf), "%s", "0");
+  strcat(process, buf);
   return 0;
 }
 
 static int pr_Injection(void) {
-  fprintf(fp_out, "%s", "0,0");
+  if(!detect) fprintf(fp_out, "%s", "0,0");
+  char buf[MAX_BUF];
+  snprintf(buf, sizeof(buf), "%s", "0,0");
+  strcat(process, buf);
   return 0;
 }
 
 static int pr_Injected(void) {
-  fprintf(fp_out, "%s", "0");
+  if(!detect) fprintf(fp_out, "%s", "0");
+  char buf[MAX_BUF];
+  snprintf(buf, sizeof(buf), "%s", "0");
+  strcat(process, buf);
   return 0;
 }
 
 static int pr_AutoRun(void) {
-  fprintf(fp_out, "%s", "0,0");
+  if(!detect) fprintf(fp_out, "%s", "0,0");
+  char buf[MAX_BUF];
+  snprintf(buf, sizeof(buf), "%s", "0,0");
+  strcat(process, buf);
   return 0;
 }
 
 static int pr_Hide(void) {
-  fprintf(fp_out, "%s", "0,0");
+  if(!detect) fprintf(fp_out, "%s", "0,0");
+  char buf[MAX_BUF];
+  snprintf(buf, sizeof(buf), "%s", "0,0");
+  strcat(process, buf);
   return 0;
 }
 
 static int pr_ImportOtherDLL(void) {
-  fprintf(fp_out, "%s", "null");
+  if(!detect) fprintf(fp_out, "%s", "null");
+  char buf[MAX_BUF];
+  snprintf(buf, sizeof(buf), "%s", "null");
+  strcat(process, buf);
   return 0;
 }
 
 static int pr_Hook(void) {
-  fprintf(fp_out, "%s", "null");
+  if(!detect) fprintf(fp_out, "%s", "null");
+  char buf[MAX_BUF];
+  snprintf(buf, sizeof(buf), "%s", "null");
+  strcat(process, buf);
   return 0;
 }
 
+void parseConnection(const char* line, char** fields, int numFields) {
+    char* token = strtok(line, "|");
+    int i = 0;
+    while (token != NULL && i < numFields) {
+        fields[i++] = token;
+        token = strtok(NULL, "|");
+    }
+}
+
 static int pr_ConnectIP(void) {
-  fprintf(fp_out, "%s", "null");
+
+  FILE* file = fopen("netstat.txt", "r");
+  if (file == NULL) {
+      perror("Error opening file");
+      return 1;
+  }
+
+  char line[1024];
+  char* fields[8];
+
+  char local_port[20];
+  char foreign_address[20];
+  char foreign_port[20];
+  char socket_time[20];
+
+  if(!feof(file)) {
+    printf("not eof\n");
+  } else {
+    printf("eof\n");
+  }
+
+  if( fgets( line, 1024, file ) == NULL ) {
+    printf("null\n");
+  } else {
+    printf("not null\n");
+  }
+
+  // if(!detect) {
+  //   while (fgets(line, sizeof(line), file) != NULL) {
+  //     fprintf(fp_out, "\n%s\n", line);
+  //     parseConnection(line, fields, 8);
+  //     fprintf(fp_out, "\n%s|%s\n", pp->pid, fields[0]);
+  //     if(!strcmp(pp->pid, fields[0])) {
+  //       char* token = strtok(fields[1], ":");
+  //       int i=0;
+  //       while (token != NULL) {
+  //           token = strtok(NULL, ":");
+  //           if(i==0) strcpy(foreign_address, token);
+  //           else strcpy(foreign_port, token);
+  //       }
+  //       strcpy(local_port, fields[5]);
+  //       strcpy(socket_time, fields[3]);
+
+  //       fprintf(fp_out, "%s|%s|%s|%s|%s>%s", "10.0.2.15", local_port, foreign_address, foreign_port, "CLOSE_WAIT", socket_time);
+  //       return;
+  //     }
+  //   }
+  // }
+
+  
+
+  // pn->name, rem_addr, pn->socket_time, pn->prg_time in_or_out_conn local_port
+  // 0 10.0.2.15,
+  // 1 51858,
+  // 2 204.79.197.200,
+  // 3 443,
+  // 4 CLOSE_WAIT>1691129938
+
+  if(!detect) fprintf(fp_out, "%s", "null");
+
+  char buf[MAX_BUF];
+  snprintf(buf, sizeof(buf), "%s", "null");
+  strcat(process, buf);
+
+
   return 0;
 }
 
@@ -379,9 +540,8 @@ const char *process_sf_options(const char *walk){
     format_node *newnode;
     int dist;
     char buf[16]; /* trust strings will be short (from above, not user) */
-    //walk = "pid,ppid,user,lstart,cmd";
     while(*walk){
-      printf("%s\n", walk);
+      
       dist = strcspn(walk, ", ");
       strncpy(buf,walk,dist);
       buf[dist] = '\0';
@@ -412,9 +572,29 @@ void show_one_proc(proc_t* p){
     (*fmt->pr)();
     fmt = fmt->next;
     if(!fmt) break;
-    fprintf(fp_out, "|");
+    if(!detect) fprintf(fp_out, "|");
+    char buf[MAX_BUF];
+    snprintf(buf, sizeof(buf), "%s", "|");
+    strcat(process, buf);
   }
-  fprintf(fp_out, "\n");
+  if(!detect) fprintf(fp_out, "\n");
+
+  if(detect && !container[current_process]) {
+    // strcpy(container[count], process);
+    write(sockfd, process, strlen(process));
+    char buffer[100];
+    int bytesRead = read(sockfd, buffer, sizeof(buffer));
+    container[current_process] = true;
+
+    // if (bytesRead <= 0) break;
+    // else if (strcmp(buffer, "DataRight") == 0) {
+    // } 
+  }
+
+  
+  
+  memset(process, 0, sizeof(process));
+
 }
 
 void show_later_one_proc(proc_t* p){
@@ -448,12 +628,12 @@ void simple_spew(){
   proc_t buf;
   PROCTAB* ptp = malloc(sizeof(PROCTAB));
   if (!ptp) {
-     fprintf(stderr, "malloc failed");
+     if(!detect) fprintf(stderr, "malloc failed");
      perror(NULL);
      exit(1);
   }
   if (!(ptp->procfs = opendir("/proc"))) {
-    fprintf(stderr, "Error: can not access /proc.\n");
+    if(!detect) fprintf(stderr, "Error: can not access /proc.\n");
     exit(1);
   }
   memset(&buf, '#', sizeof(proc_t));
@@ -471,6 +651,7 @@ void simple_spew(){
       show_one_proc(&buf);
     if(buf.cmdline) free((void*)*buf.cmdline); // ought to reuse
     if(buf.environ) free((void*)*buf.environ); // ought to reuse
+
   }
   closedir(ptp->procfs);
   free(ptp);
@@ -479,58 +660,56 @@ void simple_spew(){
 }
 
 
-
-
-
 int my_ps(){
+
+  detect = 0;
+
   init_output();
   fp_out = fopen("ps.txt", "w+");
   process_sf_options("name,lstart,cmd,processMD5,path,ppid,parent,digitalsign,pid,injection,injected,autoRun,hide,importOtherDLL,hook,connectIP");
   simple_spew();
-  
-  // if (argc > 1 && strcmp(opt, "All") == 0)
-  //   process_sf_options("pid,ppid,name,lstart,parent,path,cmd,user");
-  // else if (argc > 1 && strcmp(opt, "Info") == 0)
-  //   process_sf_options("pid,lstart,path,cmd");		/* ProcessInfo */
-  // else if (argc > 1 && strcmp(opt, "Main") == 0)
-  //   process_sf_options("pid,ppid,name,lstart,parent");	/* MainProcess */
-  // else if (argc > 1 && strcmp(opt, "Test") == 0)
-  //   process_sf_options("c,cmd,etime,lstart,name,parent");	/* MainProcess */
-  // else
-  //   process_sf_options("pid,ppid,name,lstart,parent,path,cmd");
-
-  
-
-// {"name",	pr_name},
-// {"time",	pr_time},
-// {"cmd",		pr_args},
-// {"processMD5",		pr_md5},
-// {"path",	pr_path},
-// {"parent",	pr_parent},
-
-
-
-//   {"c",		pr_c},
-// {"etime",	pr_etime},
-// {"lstart",	pr_lstart},
-// {"pid",		pr_pid},
-// {"ppid",	pr_ppid},
-// {"stat",	pr_stat},
-// {"timeout",	pr_timeout},
-// {"user",	pr_euser},
-
-  /*unsigned long old_seconds_since_boot;
-  while (1) { 
-    old_seconds_since_boot = seconds_since_boot;
-    init_output();
-    if ((seconds_since_boot - old_seconds_since_boot) < 3){
-      seconds_since_boot = old_seconds_since_boot;
-      continue;
-    }
-    printf("%lu\n", seconds_since_boot);
-    simple_spew();
-  }*/
   return 0;
+
+}
+
+void detect_ps(){
+
+
+  struct sockaddr_un server_addr;
+  
+  sockfd = socket(AF_UNIX, SOCK_STREAM, 0);
+  if (sockfd == -1) {
+      perror("socket");
+      exit(EXIT_FAILURE);
+  }
+
+  server_addr.sun_family = AF_UNIX;
+  strncpy(server_addr.sun_path, "/tmp/edetector", sizeof(server_addr.sun_path));
+
+  if (connect(sockfd, (struct sockaddr*)&server_addr, sizeof(server_addr)) == -1) {
+      perror("connect");
+      exit(EXIT_FAILURE);
+  }
+
+  for (int i=0;i<MAX_STRINGS;i++) {
+    container[i] = false;
+  }
+
+  detect = 1;
+
+
+  while(true) {
+    // printf("start\n");
+    // fp_out = fopen("detect.txt", "w+");
+    init_output();
+    process_sf_options("name,lstart,cmd,processMD5,path,ppid,parent,digitalsign,pid,injection,injected,autoRun,hide,importOtherDLL,hook");
+    simple_spew();
+    // fclose(fp_out);
+    // sleep(5);
+  }
+
+  
+
 }
 
 

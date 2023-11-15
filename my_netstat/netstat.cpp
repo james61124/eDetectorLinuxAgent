@@ -379,32 +379,58 @@ void Netstat::prg_cache_load(void)
 };*/
 
 //static void finish_this_one(int uid, unsigned long inode)
-void Netstat::finish_this_one(char *rem_addr , unsigned long inode, char *local_port, int in_or_out_conn)
+void Netstat::finish_this_one(char *rem_addr , unsigned long inode, char *local_port, int in_or_out_conn, int state)
 {
 //  struct passwd *pw;
     char ret[100];
-
-//  if ((pw = getpwuid(uid)) != NULL)
-//	printf("|%s", pw->pw_name);
-//  else
-//	printf("|%d", uid);
-//  prg_cache_get(inode, ret, sizeof ret);
+    
     prg_cache_get(inode, ret, sizeof ret, rem_addr);
     if (*ret == '-')
 	return;
-    // printf("%s,,%d,,%s\n", ret, in_or_out_conn, local_port);
-    fprintf(fp, "%s|%d|%s|%c", ret, in_or_out_conn, local_port, '\n');
     
-    char* buffer = new char[DATASTRINGMESSAGELEN];
-    sprintf(buffer, "%s|%d|%s", ret, in_or_out_conn, local_port);
-    std::string target(buffer);
+    if(scan) {
+        char* fields[8];
+        char* token = strtok(ret, "|");
+        int numFields = 4;
+        int i = 0;
+        while (token != NULL && i < numFields) {
+            fields[i++] = token;
+            token = strtok(NULL, "|");
+        }
 
-    if (netstat_info.find(target) == netstat_info.end()) {
-        SendDataPacketToServer("GiveDetectNetwork", buffer);
-        netstat_info.insert(target);
+        char* foreign[2];
+        token = strtok(fields[1], ":");
+        i = 0;
+        numFields = 2;
+        while (token != NULL && i < numFields) {
+            foreign[i++] = token;
+            token = strtok(NULL, ":");
+        }
+
+        NetInfo netinfo;
+        netinfo.process_name = fields[0];
+        netinfo.foreign_address = foreign[0];
+        netinfo.foreign_port = foreign[1];
+        netinfo.socket_time = fields[2];
+        netinfo.program_time = fields[3];
+        netinfo.local_port = local_port;
+        netinfo.in_or_out_connection = in_or_out_conn;
+        netinfo.state = state;
+
+        net_info.push_back(netinfo);
+
     }
 
-    // netstat_info
+    if(!scan) {
+        char* buffer = new char[DATASTRINGMESSAGELEN];
+        sprintf(buffer, "%s|%d|%s", ret, in_or_out_conn, local_port);
+        std::string target(buffer);
+
+        if (netstat_info.find(target) == netstat_info.end()) {
+            SendDataPacketToServer("GiveDetectNetwork", buffer);
+            netstat_info.insert(target);
+        }
+    }
 
     putchar('\n');
 }
@@ -481,7 +507,7 @@ void Netstat::sctp_assoc_do_one(int lnr, char *line, const char *proto)
 
     if (!sst_str || !txqueue_str || !rxqueue_str || !uid_str ||
         !inode_str || !lport_str || !rport_str) {
-	fprintf(stderr, _("warning, got bogus sctp assoc line.\n"));
+	if(scan) fprintf(stderr, _("warning, got bogus sctp assoc line.\n"));
 	return;
     }
 
@@ -540,7 +566,7 @@ void Netstat::sctp_assoc_do_one(int lnr, char *line, const char *proto)
 	    sprintf(buffer, "%s:%s", remote_addr, remote_port);
 
 	//finish_this_one(uid, inode);
-	finish_this_one(buffer, inode, local_port, state == 10 ? 1 : 0);
+	finish_this_one(buffer, inode, local_port, state == 10 ? 1 : 0, state);
 
 	this_local_addr = strtok_r(0, " \t\n", &ss1);
 	this_remote_addr = strtok_r(0, " \t\n", &ss2);
@@ -604,7 +630,7 @@ void Netstat::tcp_do_one(int lnr, const char *line, const char *prot)
 		 &txq, &rxq, &timer_run, &time_len, &retr, &uid, &timeout, &inode);
 
     if (num < 11) {
-	fprintf(stderr, _("warning, got bogus tcp line.\n"));
+	if(scan) fprintf(stderr, _("warning, got bogus tcp line.\n"));
 	return;
     }
 
@@ -635,7 +661,7 @@ void Netstat::tcp_do_one(int lnr, const char *line, const char *prot)
     }
 
     if ((ap = get_afntype(localsas.ss_family)) == NULL) {
-	fprintf(stderr, _("netstat: unsupported address family %d !\n"),
+	if(scan) fprintf(stderr, _("netstat: unsupported address family %d !\n"),
 		localsas.ss_family);
 	return;
     }
@@ -646,7 +672,7 @@ void Netstat::tcp_do_one(int lnr, const char *line, const char *prot)
     //printf("%-4s  %-*s %-*s %-11s", prot, (int)netmax(23,strlen(local_addr)), local_addr, (int)netmax(23,strlen(rem_addr)), rem_addr, _(tcp_state[state]));
 
     //finish_this_one(uid,inode);
-    finish_this_one(rem_addr, inode, strrchr(local_addr, ':') + 1, state == 10 ? 1 : 0);
+    finish_this_one(rem_addr, inode, strrchr(local_addr, ':') + 1, state == 10 ? 1 : 0, state);
 }
 
 int Netstat::tcp_info(void)
@@ -682,7 +708,7 @@ void Netstat::udp_do_one(int lnr, const char *line,const char *prot)
 	  &txq, &rxq, &timer_run, &time_len, &retr, &uid, &timeout, &inode);
 
     if (num < 10) {
-	fprintf(stderr, _("warning, got bogus udp line.\n"));
+	if(scan) fprintf(stderr, _("warning, got bogus udp line.\n"));
 	return;
     }
 
@@ -738,7 +764,7 @@ void Netstat::udp_do_one(int lnr, const char *line,const char *prot)
     //printf("%-5s %-23s %-23s %-11s", prot, local_addr, rem_addr, udp_state);
 
     //finish_this_one(uid,inode);
-    finish_this_one(rem_addr, inode, strrchr(local_addr, ':') + 1, state == 10 ? 1 : 0);
+    finish_this_one(rem_addr, inode, strrchr(local_addr, ':') + 1, state == 10 ? 1 : 0, state);
 }
 
 int Netstat::udp_info(void)
@@ -777,7 +803,7 @@ void Netstat::raw_do_one(int lnr, const char *line,const char *prot)
 	  &txq, &rxq, &timer_run, &time_len, &retr, &uid, &timeout, &inode);
 
     if (num < 10) {
-    	fprintf(stderr, _("warning, got bogus raw line.\n"));
+    	if(scan) fprintf(stderr, _("warning, got bogus raw line.\n"));
 	return;
     }
 
@@ -807,7 +833,7 @@ void Netstat::raw_do_one(int lnr, const char *line,const char *prot)
     }
 
     if ((ap = get_afntype(localsas.ss_family)) == NULL) {
-	fprintf(stderr, _("netstat: unsupported address family %d !\n"), localsas.ss_family);
+	if(scan) fprintf(stderr, _("netstat: unsupported address family %d !\n"), localsas.ss_family);
 	return;
     }
 
@@ -818,7 +844,7 @@ void Netstat::raw_do_one(int lnr, const char *line,const char *prot)
     //       prot, local_addr, rem_addr, state);
 
     //finish_this_one(uid,inode);
-    finish_this_one(rem_addr, inode, strrchr(local_addr, ':') + 1, state == 10 ? 1 : 0);
+    finish_this_one(rem_addr, inode, strrchr(local_addr, ':') + 1, state == 10 ? 1 : 0, state);
 }
 
 int Netstat::raw_info(void)
@@ -838,7 +864,8 @@ void Netstat::get_boot_time(void){
 
 int Netstat::my_netstat() {
 #if HAVE_AFINET
-    fp = fopen("netstat.txt", "w+");
+    scan = 0;
+    fp = fopen("netstat_tmp.txt", "w+");
     while(true) {
         get_boot_time();
         prg_cache_load();
@@ -851,6 +878,27 @@ int Netstat::my_netstat() {
 #endif
 
     return 0;
+}
+
+int Netstat::scan_netstat() {
+#if HAVE_AFINET
+    // printf("here\n");
+
+    scan = 1;
+    fp = fopen("netstat.txt", "w+");
+
+    get_boot_time();
+    prg_cache_load();
+    tcp_info();
+    sctp_info();
+    udp_info();
+    udplite_info();
+    raw_info();
+
+
+#endif
+
+    return 1;
 }
 
 int Netstat::SendDataPacketToServer(const char* function, char* buff) {

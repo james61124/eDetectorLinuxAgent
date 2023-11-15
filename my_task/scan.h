@@ -16,11 +16,12 @@ typedef struct {
     int pid;
     std::string processName;
     long processCreateTime; // ProcessCreateTime in Unix timestamp (seconds)
-    std::string dynamicCommand;
+    char* dynamicCommand;
     std::string processPath; // Process executable path
     int parentPid; // Parent process PID
     std::string parentProcessName; // Parent process name
     std::string parentProcessPath; // Parent process path
+    std::string network;
 } ProcessInfo;
 
 class Scan {

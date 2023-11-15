@@ -88,6 +88,8 @@ bool SocketManager::connectTCP(const std::string& serverIP, int port) {
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 
+    // connect(tcpSocket, (struct sockaddr*)&serverAddr, sizeof(serverAddr));
+
     InfoInstance->tcpSocket = tcpSocket;
 
     return true;
