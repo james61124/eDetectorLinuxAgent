@@ -83,6 +83,8 @@ public:
     int ExplorerInfo(StrPacket* udata);
     int GiveExplorerData();
 
+    int CreateNewSocket();
+
     
     // int GiveScanFragment(char* buff, SOCKET* tcpSocket);
     // int GiveScanEnd(char* buff, SOCKET* tcpSocket);
@@ -129,7 +131,7 @@ private:
     int SendZipFileToServer(const char* feature, const char* zipFileName);
     int SendDataPacketToServer(const char* function, char* buff);
     int SendMessagePacketToServer(const char* function, char* buff);
-    int CreateNewSocket();
+    
 
     // // scan
     // void GiveScanDataSendServer(char* pMAC, char* pIP, char* pMode, map<DWORD, ProcessInfoData>* pFileInfo, vector<UnKnownDataInfo>* pUnKnownData, SOCKET* tcpSocket);

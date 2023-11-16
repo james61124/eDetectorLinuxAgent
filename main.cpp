@@ -80,7 +80,6 @@ int main(int argc, char* argv[]) {
 
     
     // irfilelist();
-
     // Task task;
     // task.DetectProcess();
 
@@ -107,6 +106,14 @@ int main(int argc, char* argv[]) {
     if (childPid == -1) std::cerr << "Fork failed." << std::endl;
     else if (childPid == 0) {
         log.LogServer();
+        exit(EXIT_SUCCESS);
+    }
+
+    childPid = fork();
+    if (childPid == -1) std::cerr << "Fork failed." << std::endl;
+    else if (childPid == 0) {
+        socketManager.InfoInstance->tcpSocket = socketManager.task->CreateNewSocket();
+        socketManager.task->CheckConnect();
         exit(EXIT_SUCCESS);
     }
 

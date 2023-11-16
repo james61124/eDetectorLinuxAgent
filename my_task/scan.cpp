@@ -70,11 +70,7 @@ void Scan::ScanRunNowProcess() {
                 std::vector<std::string> statTokens;
                 std::string token;
 
-                // Split the stat line into tokens
-                while (std::getline(statStream, token, ' ')) {
-                    statTokens.push_back(token);
-                }
-
+                while (std::getline(statStream, token, ' ')) statTokens.push_back(token);
                 if (statTokens.size() >= 22) {
                     long processCreateTime = std::stol(statTokens[21]);
                     long unixTimestamp = jiffiesToUnixTimestamp(processCreateTime);
@@ -104,61 +100,42 @@ void Scan::ScanRunNowProcess() {
                 }
             }
 
-            // Get process's DynamicCommand (command line arguments)
+            // Get process's DynamicCommand
             std::ifstream cmdLineFile("/proc/" + dirName + "/cmdline");
             strcpy(process_info.dynamicCommand, "null");
             if (cmdLineFile) {
 
                 memset(process_info.dynamicCommand, 0, sizeof(process_info.dynamicCommand));
-
                 std::ostringstream dynamicCommandStream;
                 std::string test = "";
                 char singleChar;
                 int charCount = 0;
 
                 while (cmdLineFile.get(singleChar)) {
-                    // dynamicCommandStream << singleChar;
+                    if (!isprint(singleChar)) singleChar = ' ';
                     process_info.dynamicCommand[charCount++] = singleChar;
-                    // test += singleChar;
-                    // printf("%d %c", charCount, singleChar);
                 }
 
-                
-
-                // if (charCount == 0) {
-                //     strcpy(process_info.dynamicCommand, "null");
-                //     charCount = 4; // Set charCount to the length of "null"
-                // }
-
-                // Ensure null termination
-                process_info.dynamicCommand[charCount] = '\0';
-
-                // printf("\nthis: %d %s\n", charCount, process_info.dynamicCommand);
-
-
-                // if (dynamicCommand.empty()) {
-                //     dynamicCommand = "null";
-                // }
-                
-                // process_info.dynamicCommand = dynamicCommand;
+                if( charCount > 0 ) process_info.dynamicCommand[charCount-1] = '\0';
             }
-
 
             // Get process path
             std::string processPath = getProcessPath(std::stoi(dirName));
 
-            if (processPath.empty()) {
-                processPath = "[" + process_info.processName + "]";
+            if (process_info.dynamicCommand[0] == '\0') {
+                strcat(process_info.dynamicCommand, "[");
+                strcat(process_info.dynamicCommand, process_info.processName.c_str());
+                strcat(process_info.dynamicCommand, "]");
             }
 
             process_info.processPath = processPath;
-
+            if(process_info.processPath.empty()) process_info.processPath = "null";
+            if(process_info.parentProcessPath.empty()) process_info.parentProcessPath = "null";
             
             ProcessList.push_back(process_info);
             process_id.insert(process_info.pid);
 
-            // std::cout << "PID: " << dirName << ", ProcessName: " << processName << ", ProcessCreateTime (Unix Timestamp): " << unixTimestamp << " seconds since Epoch, DynamicCommand: " << dynamicCommand << ", ProcessPath: " << processPath << ", ParentPID: " << parentPid << ", ParentProcessName: " << parentProcessName << ", ParentProcessPath: " << parentProcessPath << std::endl;
-                            
+            // std::cout << "PID: " << dirName << ", ProcessName: " << processName << ", ProcessCreateTime (Unix Timestamp): " << unixTimestamp << " seconds since Epoch, DynamicCommand: " << dynamicCommand << ", ProcessPath: " << processPath << ", ParentPID: " << parentPid << ", ParentProcessName: " << parentProcessName << ", ParentProcessPath: " << parentProcessPath << std::endl;                            
         }
     }
 
