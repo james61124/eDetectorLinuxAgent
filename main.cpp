@@ -1,5 +1,6 @@
 #include <iostream>
 #include <thread>
+#include <sys/wait.h>
 
 #include "my_task/info.h"
 #include "my_task/socket_manager.h"
@@ -75,6 +76,10 @@
 // }
 
 // nohup ./agent 192.168.200.163 1988 1989 &
+void sigchld_handler(int signo) {
+    (void)signo;
+    while (waitpid(-1, NULL, WNOHANG) > 0);
+}
 
 int main(int argc, char* argv[]) {
 
@@ -87,6 +92,11 @@ int main(int argc, char* argv[]) {
         std::cerr << "Usage: " << argv[0] << " <serverIP> <port>" << std::endl;
         return 1;
     }
+
+    struct sigaction sa;
+    sa.sa_handler = sigchld_handler;
+    sa.sa_flags = SA_RESTART | SA_NOCLDSTOP;
+    sigaction(SIGCHLD, &sa, NULL);
 
     std::string serverIP = argv[1];
     int port = std::stoi(argv[2]);
@@ -108,14 +118,17 @@ int main(int argc, char* argv[]) {
         log.LogServer();
         exit(EXIT_SUCCESS);
     }
+    info->processMap["Log"] = childPid;
 
     childPid = fork();
     if (childPid == -1) std::cerr << "Fork failed." << std::endl;
     else if (childPid == 0) {
         socketManager.InfoInstance->tcpSocket = socketManager.task->CreateNewSocket();
+        socketManager.getSystemInfo();
         socketManager.task->CheckConnect();
         exit(EXIT_SUCCESS);
     }
+    info->processMap["CheckConnect"] = childPid;
 
     // handshake
     std::thread receiveThread([&]() { socketManager.receiveTCP(); });

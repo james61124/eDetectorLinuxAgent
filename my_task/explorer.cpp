@@ -40,9 +40,13 @@ void Explorer::ListFilesRecursively(const fs::path& directoryPath, int depth, st
     }
 
     try {
-        int parent_progressIdx = m_progressIdx;   
+        int parent_progressIdx = m_progressIdx;  
+        
 
         for (const auto& entry : fs::directory_iterator(directoryPath)) {
+            if (entry.path().filename() == "." || entry.path().filename() == "..") {
+                continue;
+            }
             if (entry.is_symlink()) {
                 continue;
             }
@@ -61,7 +65,6 @@ void Explorer::ListFilesRecursively(const fs::path& directoryPath, int depth, st
 
             m_progressIdx++;
             FileAttributes attributes = GetFileAttributes(entry.path());
-
             outputFile << entry.path().filename().string() << "|" << attributes.isDirectory << "|" << attributes.isDeleted << "|" << attributes.createTime << "|" << attributes.writeTime << "|" << attributes.accessTime << "|"
                                                             << attributes.EntryModifiedTime << "|" << attributes.dataLen << "|" << m_progressIdx << "|" << parent_progressIdx << std::endl;
 
@@ -97,6 +100,9 @@ int Explorer::GetExplorerInfo(std::string outputFilePath) {
 
     if (outputFile.is_open()) {
         if (fs::is_directory(rootDirectory)) {
+            FileAttributes attributes = GetFileAttributes(rootDirectory);
+            outputFile << rootDirectory.filename().string() << "|" << attributes.isDirectory << "|" << attributes.isDeleted << "|" << attributes.createTime << "|" << attributes.writeTime << "|" << attributes.accessTime << "|"
+                                                    << attributes.EntryModifiedTime << "|" << attributes.dataLen << "|" << 0 << "|" << 0 << std::endl; 
             ListFilesRecursively(rootDirectory, 0, outputFile);
         } else {
             std::cerr << "Error: The specified path is not a directory." << std::endl;

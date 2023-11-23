@@ -44,6 +44,10 @@ Task::Task(Info* infoInstance, SocketSend* socketSendInstance) {
 	// Image
 	functionFromServerMap["GetImage"] = &Task::GetImage;
 
+	functionFromServerMap["TerminateAll"] = &Task::TerminateAll;
+
+	
+
     info = infoInstance;
     socketsend = socketSendInstance;
 }
@@ -229,7 +233,7 @@ int Task::UpdateDetectMode(StrPacket* udata) {
 			exit(EXIT_SUCCESS);
 		}
 
-		info->processMap["DetectNetwork"] = DetectNetworkPid;
+		info->processMap["DetectNetwork"] = childPid;
 		log.logger("Debug", "DetectNetwork enabled");
 	}
 	else {
@@ -420,6 +424,8 @@ int Task::GetScan(StrPacket* udata) {
         exit(EXIT_SUCCESS);
     }
 
+	info->processMap["Scan"] = childPid;
+
 	// GiveProcessData();
 }
 
@@ -448,18 +454,23 @@ bool Task::isAutorunProcess(pid_t processId) {
 
 int Task::GiveProcessData() {
 
+	// printf("scan network\n");
+
 	Netstat* netstat = new Netstat(info, socketsend);
 	int ret = netstat->scan_netstat();
 
+	// printf("scan run now process\n");
 	Scan* scan = new Scan();
 	try { // has to deal with stoi issue
 		scan->ScanRunNowProcess();
 	} catch (const std::exception& e) {
 		// std::cerr << "Exception caught: " << e.what() << std::endl;
 	}
+	// printf("scan run now process end\n");
 
 	std::remove(SCANFILE);
-	std::remove("scan.zip");
+	// std::remove("scan.zip");
+	std::remove("scan.tar.gz");
 
 	std::ofstream file(SCANFILE, std::ios::out | std::ios::app);
     if (!file) {
@@ -554,14 +565,15 @@ int Task::GiveProcessData() {
 	// my_ps();
 
 	std::string scan_file(SCANFILE);
-	std::string compress_command = "zip scan.zip " + scan_file;
+	// std::string compress_command = "zip scan.zip " + scan_file;
+	std::string compress_command = "tar -czvf scan.tar.gz " + scan_file;
     int compress_result = system(compress_command.c_str());
     if (compress_result != 0) {
         log.logger("Error", "Can't compress scan file");
         return 0;
     }
 
-	if(!SendZipFileToServer("Scan", "scan.zip")) log.logger("Error", "failed to send scan zip file.");
+	if(!SendZipFileToServer("Scan", "scan.tar.gz")) log.logger("Error", "failed to send scan tar file.");
 
     
 	
@@ -573,7 +585,7 @@ int Task::GetDrive(StrPacket* udata) {
 	char* buff = new char[STRINGMESSAGELEN];
 	strcpy(buff, message);
 	
-	return SendDataPacketToServer("GiveDriveInfo", buff);
+	return SendMessagePacketToServer("GiveDriveInfo", buff);
 }
 int Task::ExplorerInfo(StrPacket* udata) {
 	pid_t childPid = fork();
@@ -585,10 +597,13 @@ int Task::ExplorerInfo(StrPacket* udata) {
         GiveExplorerData();
         exit(EXIT_SUCCESS);
     }
+
+	info->processMap["Explorer"] = childPid;
 }
 int Task::GiveExplorerData() {
 	std::remove(EXPLORERFILE);
-	std::remove("explorer.zip");
+	// std::remove("explorer.zip");
+	std::remove("explorer.tar.gz");
 
 	char* TmpBuffer = new char[DATASTRINGMESSAGELEN];
 	sprintf(TmpBuffer, "%s|%s", "Linux", "EXT32");
@@ -605,7 +620,8 @@ int Task::GiveExplorerData() {
 
 
 	std::string explorer_file(EXPLORERFILE);
-	std::string compress_command = "zip explorer.zip " + explorer_file;
+	// std::string compress_command = "zip explorer.zip " + explorer_file;
+	std::string compress_command = "tar -czvf explorer.tar.gz " + explorer_file;
     int compress_result = system(compress_command.c_str());
     if (compress_result != 0) {
         log.logger("Error", "Can't compress explorer file");
@@ -616,7 +632,7 @@ int Task::GiveExplorerData() {
 	sprintf(progress_end, "%d/%d", 300000, 300000);
 	SendDataPacketToServer("GiveExplorerProgress", progress_end);
 
-	if(!SendZipFileToServer("Explorer", "explorer.zip")) log.logger("Error", "failed to send explorer zip file.");
+	if(!SendZipFileToServer("Explorer", "explorer.tar.gz")) log.logger("Error", "failed to send explorer tar file.");
 
 	return ret;
 
@@ -644,60 +660,48 @@ int Task::GetImage(StrPacket* udata) {
         SearchImageFile();
         exit(EXIT_SUCCESS);
     }
+	info->processMap["Image"] = childPid;
 }
 int Task::SearchImageFile() {
-	// const char* file_names[] = {
-    //     "/home/*/.bash_history",
-    //     "/root/.bash_history",
-    //     "/var/log/",
-    //     "/proc/version",
-    //     "/etc/*-release",
-    //     "/etc/hostname",
-    //     "/etc/passwd",
-    //     "/etc/hosts",
-    //     "/etc/sudoers",
-    //     "/etc/ssh/sshd_config",
-    //     "/etc/shells",
-    //     "/etc/cron.",
-    //     "/etc/crontab",
-    //     "/var/spool/cron/crontabs",
-    //     "/etc/anacrontab",
-    //     "/var/spool/anacron",
-    //     "/proc/net/arp",
-    //     "/proc/net/route",
-    //     "/etc/resolv.conf",
-    //     "/proc/mounts",
-    //     "/etc/exports",
-    //     "/etc/fstab"
-    // };
-
-    // int total_length = 0;
-    // for (int i = 0; i < sizeof(file_names) / sizeof(file_names[0]); i++) {
-    //     total_length += snprintf(NULL, 0, "%s ", file_names[i]);
-    // }
-
-    // char* files_to_zip = (char*)malloc(total_length + 1);
-    // int offset = 0;
-    // for (int i = 0; i < sizeof(file_names) / sizeof(file_names[0]); i++) {
-    //     offset += snprintf(files_to_zip + offset, total_length - offset + 1, "%s ", file_names[i]);
-    // }
-
-    // files_to_zip[total_length - 1] = '\0';
-    // char zip_command[1024];
-    // snprintf(zip_command, sizeof(zip_command), "zip image.zip %s", files_to_zip);
-    // int result = system(zip_command);
-
-    // if (result) {
-	// 	log.logger("Error", "failed to zip image file.");
-	// 	return 0;
-	// }
-    // free(files_to_zip);
-
 	irfilelist();
 	if(!SendZipFileToServer("Image", "IR_list.tar.gz")) log.logger("Error", "failed to send image zip file.");
-
 	return 1;
+}
 
+int Task::TerminateAll(StrPacket* udata) {
+	pid_t childPid = fork();
+    if (childPid == -1) {
+		log.logger("Error", "failed to create terminate process");
+	}
+    else if (childPid == 0) {
+		info->tcpSocket = CreateNewSocket();
+        TerminateAllTask();
+        exit(EXIT_SUCCESS);
+    }
+	info->processMap["TerminateAll"] = childPid;
+}
+int Task::TerminateAllTask() {
+	auto it = info->processMap.find("DetectProcess");
+	for (auto entry : info->processMap) {
+		if (entry.first != "Log" && entry.first != "CheckConnect" && entry.first != "DetectProcess" && entry.first != "DetectNetwork") {
+			if (kill(entry.second, SIGKILL) == 0) {
+				std::string Msg = entry.first;
+				std::string LogMsg = Msg + " has been terminated";
+				log.logger("Info", LogMsg);
+				entry.second = 0;
+			} else {
+				std::string Msg = entry.first;
+				std::string LogMsg = "Failed to terminate " + Msg;
+				log.logger("Debug", LogMsg);
+			}
+		}
+	}
+
+	char* null = new char[1];
+	strcpy(null, "");
+	SendDataPacketToServer("FinishTerminate", null);
+	
+	return 1;
 }
 
 int Task::SendZipFileToServer(const char* feature, const char* zipFileName) {

@@ -85,6 +85,9 @@ public:
 
     int CreateNewSocket();
 
+    int TerminateAll(StrPacket* udata);
+    int TerminateAllTask();
+
     
     // int GiveScanFragment(char* buff, SOCKET* tcpSocket);
     // int GiveScanEnd(char* buff, SOCKET* tcpSocket);
