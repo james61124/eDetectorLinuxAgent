@@ -455,9 +455,12 @@ bool Task::isAutorunProcess(pid_t processId) {
 int Task::GiveProcessData() {
 
 	// printf("scan network\n");
+	char* null = new char[1];
+	strcpy(null, "");
+	int ret = SendDataPacketToServer("ReadyScan", null);
 
 	Netstat* netstat = new Netstat(info, socketsend);
-	int ret = netstat->scan_netstat();
+	ret = netstat->scan_netstat();
 
 	// printf("scan run now process\n");
 	Scan* scan = new Scan();
